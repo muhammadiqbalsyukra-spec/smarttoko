@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartToko App</title>
+
+<style>
+body { font-family: Arial; margin:0; background:#f5f5f5;}
+header { background:#4CAF50; color:white; padding:15px; text-align:center;}
+.container { padding:10px;}
+.card { background:white; padding:10px; margin:10px 0; border-radius:10px;}
+input, select, button { padding:10px; margin:5px 0; width:100%;}
+button { background:#4CAF50; color:white; border:none; border-radius:5px;}
+img { width:100%; max-height:150px; object-fit:cover;}
+.total { font-weight:bold; color:green; }
+</style>
+</head>
+
+<body>
+
+<header>
+<h2>🛒 SmartToko App</h2>
+</header>
+
+<!-- LOGIN -->
+<div class="container" id="loginBox">
+  <h3>Login Admin</h3>
+  <input id="email" placeholder="Email">
+  <input id="password" type="password" placeholder="Password">
+  <button onclick="login()">Login</button>
+</div>
+
+<!-- APP -->
+<div class="container" id="app" style="display:none;">
+
+<button onclick="logout()">Logout</button>
+
+<h3>Tambah Produk</h3>
+
+<input id="nama" placeholder="Nama Produk">
+<input id="harga_pcs" type="number" placeholder="Harga PCS">
+<input id="harga_crt" type="number" placeholder="Harga Karton (CRT)">
+<input id="isi_crt" type="number" placeholder="Isi per CRT (contoh: 24)">
+<input id="stok" type="number" placeholder="Stok">
+<input id="satuan" placeholder="Satuan awal (pcs / crt)">
+<input id="foto" placeholder="Link Foto">
+
+<button onclick="kirimData()">Tambah</button>
+
+<h3>Daftar Produk</h3>
+<div id="list"></div>
+
+</div>
+
+<script>
+let produk = JSON.parse(localStorage.getItem("produk")) || [];
+
+function simpan() {
+  localStorage.setItem("produk", JSON.stringify(produk));
+}
+
+function tampil() {
+  let html = "";
+  produk.forEach((p, i) => {
+    html += `
+    <div class="card">
+      <img src="${p.foto || 'https://via.placeholder.com/150'}">
+      <h4>${p.nama}</h4>
+
+      <p>Harga PCS: Rp ${p.harga_pcs}</p>
+      <p>Harga CRT: Rp ${p.harga_crt}</p>
+      <p>Stok: ${p.stok} PCS</p>
+      <p>1 CRT = ${p.isi_crt} PCS</p>
+
+      <select onchange="hitung(${i})" id="mode${i}">
+        <option value="pcs">Jual PCS</option>
+        <option value="crt">Jual CRT</option>
+      </select>
+
+      <input type="number" placeholder="Qty" oninput="hitung(${i})" id="qty${i}">
+      
+      <p class="total" id="total${i}">Total: Rp 0</p>
+
+      <button onclick="jual(${i})">Jual Cepat</button>
+
+      <hr>
+
+      <input type="number" placeholder="Barang Masuk" onchange="masuk(${i}, this.value)">
+      <input type="number" placeholder="Barang Keluar" onchange="keluar(${i}, this.value)">
+
+      <button onclick="hapus(${i})">Hapus</button>
+      <button onclick="share(${i})">Share WA</button>
+    </div>
+    `;
+  });
+
+  document.getElementById("list").innerHTML = html;
+}
+
+function hitung(i){
+  let p = produk[i];
+  let qty = parseInt(document.getElementById("qty"+i).value || 0);
+  let mode = document.getElementById("mode"+i).value;
+
+  let total = mode === "pcs"
+    ? qty * p.harga_pcs
+    : qty * p.harga_crt;
+
+  document.getElementById("total"+i).innerText = "Total: Rp " + total;
+}
+
+function jual(i){
+  let p = produk[i];
+  let qty = parseInt(document.getElementById("qty"+i).value || 0);
+  let mode = document.getElementById("mode"+i).value;
+
+  let keluarPCS = mode === "pcs"
+    ? qty
+    : qty * p.isi_crt;
+
+  if(p.stok < keluarPCS){
+    alert("Stok tidak cukup!");
+    return;
+  }
+
+  p.stok -= keluarPCS;
+
+  simpan();
+  tampil();
+
+  alert("Penjualan berhasil!");
+}
+
+function masuk(i, val) {
+  produk[i].stok += parseInt(val || 0);
+  simpan();
+  tampil();
+}
+
+function keluar(i, val) {
+  let keluar = parseInt(val || 0);
+  if (produk[i].stok - keluar < 0) {
+    alert("Stok tidak cukup!");
+    return;
+  }
+  produk[i].stok -= keluar;
+  simpan();
+  tampil();
+}
+
+function hapus(i) {
+  produk.splice(i, 1);
+  simpan();
+  tampil();
+}
+
+function share(i) {
+  let p = produk[i];
+  let text = `🛒 ${p.nama}
+Harga PCS: Rp ${p.harga_pcs}
+Harga CRT: Rp ${p.harga_crt}
+Stok: ${p.stok} PCS`;
+
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`);
+}
+
+tampil();
+</script>
+
+<!-- FIREBASE -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBYkPd9KaoJoSEAhO2BsVz8P76GnNJuVnY",
+  authDomain: "smarttoko-cfa75.firebaseapp.com",
+  projectId: "smarttoko-cfa75",
+  storageBucket: "smarttoko-cfa75.firebasestorage.app",
+  messagingSenderId: "408497647205",
+  appId: "1:408497647205:web:cedd0b3ec9775c4897e08c",
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+// LOGIN
+window.login = async function(){
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+    alert("Login berhasil!");
+  } catch(e){
+    alert("Login gagal: " + e.message);
+  }
+}
+
+// LOGOUT
+window.logout = function(){
+  signOut(auth);
+}
+
+// CEK LOGIN
+onAuthStateChanged(auth, (user) => {
+  if(user){
+    document.getElementById("loginBox").style.display = "none";
+    document.getElementById("app").style.display = "block";
+  } else {
+    document.getElementById("loginBox").style.display = "block";
+    document.getElementById("app").style.display = "none";
+  }
+});
+
+// SIMPAN PRODUK
+window.kirimData = async function() {
+  const nama = document.getElementById("nama").value;
+  const harga_pcs = document.getElementById("harga_pcs").value;
+  const harga_crt = document.getElementById("harga_crt").value;
+  const isi_crt = document.getElementById("isi_crt").value;
+  const stok = document.getElementById("stok").value;
+  const satuan = document.getElementById("satuan").value;
+  const foto = document.getElementById("foto").value;
+
+  let stok_final = parseInt(stok);
+
+  if(satuan.toLowerCase() === "crt"){
+    stok_final = stok * isi_crt;
+  }
+
+  let p = {
+    nama,
+    harga_pcs: parseInt(harga_pcs),
+    harga_crt: parseInt(harga_crt),
+    isi_crt: parseInt(isi_crt),
+    stok: stok_final,
+    foto
+  };
+
+  produk.push(p);
+  localStorage.setItem("produk", JSON.stringify(produk));
+  tampil();
+
+  await addDoc(collection(db, "produk"), p);
+
+  alert("Produk berhasil disimpan!");
+}
+</script>
+
+</body>
+</html>
