@@ -57,9 +57,15 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getFirestore, collection, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-const firebaseConfig = {
-  apiKey: "ISI PUNYA KAMU",
+const const firebaseConfig = {
+  apiKey: "AIzaSyBYkPd9KaoJoSEAhO2BsVz8P76GnNJuVnY",
+  authDomain: "smarttoko-cfa75.firebaseapp.com",
+  projectId: "smarttoko-cfa75",
+  storageBucket: "smarttoko-cfa75.firebasestorage.app",
+  messagingSenderId: "408497647205",
+  appId: "1:408497647205:web:cedd0b3ec9775c4897e08c",
 };
+
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
