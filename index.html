@@ -49,14 +49,16 @@ button { background:#22c55e; color:white; border:none;}
 <h3>Daftar Produk</h3>
 <div id="list" class="grid"></div>
 
+<h3>Laporan Penjualan</h3>
+<div id="laporan"></div>
+
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-// ✅ CONFIG SUDAH BENAR
 const firebaseConfig = {
   apiKey: "AIzaSyBYkPd9KaoJoSEAhO2BsVz8P76GnNJuVnY",
   authDomain: "smarttoko-cfa75.firebaseapp.com",
@@ -85,7 +87,6 @@ window.login = async function(){
   try {
     await signInWithEmailAndPassword(auth, email, password);
   } catch(e){
-    console.error(e);
     alert("Login gagal: " + e.message);
   }
 }
@@ -101,13 +102,14 @@ onAuthStateChanged(auth, (user) => {
     document.getElementById("loginBox").style.display = "none";
     document.getElementById("app").style.display = "block";
     ambilData();
+    loadLaporan();
   } else {
     document.getElementById("loginBox").style.display = "block";
     document.getElementById("app").style.display = "none";
   }
 });
 
-// AMBIL DATA REALTIME
+// AMBIL PRODUK
 function ambilData(){
   onSnapshot(collection(db, "produk"), (snapshot) => {
     produk = [];
@@ -115,19 +117,12 @@ function ambilData(){
       produk.push({ id: doc.id, ...doc.data() });
     });
     tampil();
-  }, (error)=>{
-    console.error(error);
-    alert("Gagal ambil data!");
   });
 }
 
-// TAMPIL
+// TAMPIL PRODUK
 function tampil(){
   let html = "";
-
-  if(produk.length === 0){
-    html = "<p>Belum ada produk</p>";
-  }
 
   produk.forEach((p,i)=>{
     html += `
@@ -147,6 +142,7 @@ function tampil(){
       <input type="number" placeholder="Qty" oninput="hitung(${i})" id="qty${i}">
       <p class="total" id="total${i}">Rp 0</p>
 
+      <button onclick="jual(${i})">Jual</button>
       <button onclick="share(${i})">Share</button>
     </div>
     `;
@@ -168,12 +164,45 @@ window.hitung = function(i){
   document.getElementById("total"+i).innerText = "Rp " + total;
 }
 
+// JUAL
+window.jual = async function(i){
+  let p = produk[i];
+  let qty = parseInt(document.getElementById("qty"+i).value || 0);
+  let mode = document.getElementById("mode"+i).value;
+
+  if(qty <= 0){
+    alert("Isi qty dulu!");
+    return;
+  }
+
+  let keluarPCS = mode === "pcs" ? qty : qty * p.isi_crt;
+
+  if(p.stok < keluarPCS){
+    alert("Stok tidak cukup!");
+    return;
+  }
+
+  let stokBaru = p.stok - keluarPCS;
+
+  await updateDoc(doc(db, "produk", p.id), {
+    stok: stokBaru
+  });
+
+  await addDoc(collection(db, "penjualan"), {
+    nama: p.nama,
+    qty: qty,
+    mode: mode,
+    total: mode === "pcs" ? qty * p.harga_pcs : qty * p.harga_crt,
+    waktu: new Date()
+  });
+
+  alert("Penjualan berhasil!");
+}
+
 // SHARE
 window.share = function(i){
   let p = produk[i];
-  let text = `🛒 ${p.nama}
-Rp ${p.harga_pcs}`;
-
+  let text = `🛒 ${p.nama}\nRp ${p.harga_pcs}`;
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`);
 }
 
@@ -195,13 +224,32 @@ window.kirimData = async function(){
     foto: document.getElementById("foto").value
   };
 
-  try{
-    await addDoc(collection(db,"produk"), p);
-    alert("Produk berhasil ditambahkan!");
-  }catch(e){
-    console.error(e);
-    alert("Gagal simpan!");
-  }
+  await addDoc(collection(db,"produk"), p);
+  alert("Produk ditambahkan!");
+}
+
+// LAPORAN
+function loadLaporan(){
+  onSnapshot(collection(db, "penjualan"), (snapshot) => {
+    let html = "";
+    let total = 0;
+
+    snapshot.forEach(doc => {
+      let d = doc.data();
+      total += d.total;
+
+      html += `
+      <div class="card">
+        <b>${d.nama}</b><br>
+        Qty: ${d.qty} (${d.mode})<br>
+        Total: Rp ${d.total}
+      </div>
+      `;
+    });
+
+    html += `<h3>Total: Rp ${total}</h3>`;
+    document.getElementById("laporan").innerHTML = html;
+  });
 }
 </script>
 
