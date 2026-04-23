@@ -56,7 +56,7 @@ button { background:#22c55e; color:white; border:none;}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -144,6 +144,7 @@ function tampil(){
 
       <button onclick="jual(${i})">Jual</button>
       <button onclick="share(${i})">Share</button>
+      <button onclick="hapus(${i})" style="background:red;">Hapus</button>
     </div>
     `;
   });
@@ -197,6 +198,21 @@ window.jual = async function(i){
   });
 
   alert("Penjualan berhasil!");
+}
+
+// HAPUS PRODUK
+window.hapus = async function(i){
+  let p = produk[i];
+
+  let konfirmasi = confirm("Yakin hapus produk ini?");
+  if(!konfirmasi) return;
+
+  try{
+    await deleteDoc(doc(db, "produk", p.id));
+    alert("Produk berhasil dihapus!");
+  }catch(e){
+    alert("Gagal hapus!");
+  }
 }
 
 // SHARE
