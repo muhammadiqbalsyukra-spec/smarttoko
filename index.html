@@ -3,80 +3,50 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Toko Kasir Modern</title>
+<title>Kasir Modern Pro</title>
 
 <style>
-body {
-  font-family: Arial;
-  background: #f2f2f2;
-  margin: 0;
-}
-
-header {
-  background: #2c7be5;
-  color: white;
-  padding: 15px;
-  text-align: center;
-}
-
-.container {
-  padding: 10px;
-  max-width: 600px;
-  margin: auto;
-}
-
-input {
-  width: 100%;
-  padding: 10px;
-  margin-bottom: 10px;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-}
-
-.card {
-  background: white;
-  padding: 10px;
-  border-radius: 10px;
-  text-align: center;
-}
-
-.card img {
-  width: 80px;
-}
-
-button {
-  padding: 8px;
-  background: green;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  margin-top: 5px;
-}
-
-.keranjang {
-  margin-top: 10px;
-}
-
-.struk {
-  background: white;
-  padding: 15px;
-  margin-top: 15px;
-  font-size: 13px;
-}
+body {font-family: Arial; background:#f2f2f2; margin:0;}
+header {background:#2c7be5; color:white; padding:15px; text-align:center;}
+.container {padding:10px; max-width:600px; margin:auto;}
+input, select {width:100%; padding:10px; margin-bottom:8px;}
+.grid {display:grid; grid-template-columns:repeat(2,1fr); gap:10px;}
+.card {background:white; padding:10px; border-radius:10px;}
+button {padding:6px; margin-top:5px; border:none; border-radius:6px; cursor:pointer;}
+.btn-add{background:green;color:white;}
+.btn-edit{background:orange;color:white;}
+.btn-del{background:red;color:white;}
+.struk{background:white;padding:15px;margin-top:10px;font-size:13px;}
 </style>
-
 </head>
+
 <body>
 
-<header>
-  <h2>Toko Kasir Modern</h2>
-</header>
+<header><h2>Kasir Modern Pro</h2></header>
 
 <div class="container">
+
+<!-- FORM PRODUK -->
+<div class="card">
+<h3>Input Produk</h3>
+<input type="hidden" id="editIndex">
+
+<input type="text" id="namaBarang" placeholder="Nama barang">
+<input type="number" id="hargaBarang" placeholder="Harga">
+<input type="number" id="stokBarang" placeholder="Stok">
+
+<select id="ukuran">
+<option value="">Ukuran</option>
+<option>S</option><option>M</option><option>L</option><option>XL</option>
+</select>
+
+<select id="warna">
+<option value="">Warna</option>
+<option>Merah</option><option>Biru</option><option>Hitam</option><option>Putih</option>
+</select>
+
+<button class="btn-add" onclick="simpanProduk()">Simpan Produk</button>
+</div>
 
 <input type="text" id="barcode" placeholder="Scan / ketik barcode..." onkeyup="cariProduk(event)">
 
@@ -84,10 +54,9 @@ button {
 <div class="grid" id="catalog"></div>
 
 <h3>Keranjang</h3>
-<div id="keranjang" class="keranjang"></div>
+<div id="keranjang"></div>
 
 <h3>Total: Rp <span id="total">0</span></h3>
-
 <button onclick="buatStruk()">Cetak Struk</button>
 
 <div id="struk"></div>
@@ -96,115 +65,151 @@ button {
 
 <script>
 
-// DATABASE PRODUK (sementara)
+// DATABASE (sementara)
 let produkDB = [
-  {barcode:"111", nama:"Indomie Goreng", harga:3000, gambar:"images/indomie.jpg"},
-  {barcode:"222", nama:"Teh Botol", harga:5000, gambar:"images/teh.jpg"},
-  {barcode:"333", nama:"Sosis Belfood", harga:27000, gambar:"images/sosis.jpg"},
-  {barcode:"444", nama:"Sunlight", harga:15000, gambar:"images/sunlight.jpg"}
+ {barcode:"111", nama:"Indomie", harga:3000, stok:10, ukuran:"-", warna:"-"},
+ {barcode:"222", nama:"Teh Botol", harga:5000, stok:8, ukuran:"-", warna:"-"}
 ];
 
 let keranjang = [];
 
-// TAMPILKAN CATALOG
-function loadCatalog() {
-  let html = "";
-  produkDB.forEach(p => {
-    html += `
-      <div class="card">
-        <img src="${p.gambar}">
-        <h4>${p.nama}</h4>
-        <p>Rp ${p.harga}</p>
-        <button onclick="tambahKeranjang('${p.barcode}')">Tambah</button>
-      </div>
-    `;
+// LOAD CATALOG
+function loadCatalog(){
+ let html="";
+ produkDB.forEach((p,i)=>{
+  html+=`
+   <div class="card">
+     <b>${p.nama}</b><br>
+     Rp ${p.harga}<br>
+     Stok: ${p.stok}<br>
+     ${p.ukuran} | ${p.warna}<br>
+
+     <button class="btn-add" onclick="tambahKeranjang('${p.barcode}')">Tambah</button>
+     <button class="btn-edit" onclick="editProduk(${i})">Edit</button>
+     <button class="btn-del" onclick="hapusProduk(${i})">Hapus</button>
+   </div>
+  `;
+ });
+ document.getElementById("catalog").innerHTML=html;
+}
+
+// SIMPAN / UPDATE PRODUK
+function simpanProduk(){
+ let nama=document.getElementById("namaBarang").value;
+ let harga=parseInt(document.getElementById("hargaBarang").value);
+ let stok=parseInt(document.getElementById("stokBarang").value);
+ let ukuran=document.getElementById("ukuran").value||"-";
+ let warna=document.getElementById("warna").value||"-";
+ let editIndex=document.getElementById("editIndex").value;
+
+ if(!nama||!harga||!stok){
+  alert("Lengkapi data!");
+  return;
+ }
+
+ if(editIndex===""){
+  produkDB.push({
+    barcode:Date.now().toString(),
+    nama,harga,stok,ukuran,warna
   });
-  document.getElementById("catalog").innerHTML = html;
+ }else{
+  produkDB[editIndex]={...produkDB[editIndex],nama,harga,stok,ukuran,warna};
+ }
+
+ resetForm();
+ loadCatalog();
 }
 
-// CARI PRODUK DARI BARCODE
-function cariProduk(e) {
-  if (e.key === "Enter") {
-    let kode = document.getElementById("barcode").value;
-    tambahKeranjang(kode);
-    document.getElementById("barcode").value = "";
-  }
+// EDIT
+function editProduk(i){
+ let p=produkDB[i];
+ document.getElementById("editIndex").value=i;
+ document.getElementById("namaBarang").value=p.nama;
+ document.getElementById("hargaBarang").value=p.harga;
+ document.getElementById("stokBarang").value=p.stok;
+ document.getElementById("ukuran").value=p.ukuran;
+ document.getElementById("warna").value=p.warna;
 }
 
-// TAMBAH KE KERANJANG
-function tambahKeranjang(barcode) {
-  let produk = produkDB.find(p => p.barcode === barcode);
+// HAPUS
+function hapusProduk(i){
+ if(confirm("Hapus produk?")){
+  produkDB.splice(i,1);
+  loadCatalog();
+ }
+}
 
-  if (!produk) {
-    alert("Produk tidak ditemukan");
-    return;
-  }
+// RESET FORM
+function resetForm(){
+ document.getElementById("editIndex").value="";
+ document.getElementById("namaBarang").value="";
+ document.getElementById("hargaBarang").value="";
+ document.getElementById("stokBarang").value="";
+ document.getElementById("ukuran").value="";
+ document.getElementById("warna").value="";
+}
 
-  let item = keranjang.find(i => i.barcode === barcode);
+// BARCODE
+function cariProduk(e){
+ if(e.key==="Enter"){
+  tambahKeranjang(document.getElementById("barcode").value);
+  document.getElementById("barcode").value="";
+ }
+}
 
-  if (item) {
-    item.qty++;
-  } else {
-    keranjang.push({...produk, qty:1});
-  }
+// TAMBAH KE KERANJANG + KURANGI STOK
+function tambahKeranjang(barcode){
+ let p=produkDB.find(x=>x.barcode===barcode);
 
-  renderKeranjang();
+ if(!p){alert("Tidak ditemukan");return;}
+ if(p.stok<=0){alert("Stok habis");return;}
+
+ p.stok--;
+
+ let item=keranjang.find(i=>i.barcode===barcode);
+
+ if(item){item.qty++;}
+ else{keranjang.push({...p,qty:1});}
+
+ renderKeranjang();
+ loadCatalog();
 }
 
 // RENDER KERANJANG
-function renderKeranjang() {
-  let html = "";
-  let total = 0;
+function renderKeranjang(){
+ let html="";
+ let total=0;
 
-  keranjang.forEach(item => {
-    let subtotal = item.harga * item.qty;
-    total += subtotal;
+ keranjang.forEach(i=>{
+  let sub=i.qty*i.harga;
+  total+=sub;
 
-    html += `
-      <div class="card">
-        ${item.nama} x ${item.qty} <br>
-        Rp ${subtotal}
-      </div>
-    `;
-  });
+  html+=`
+   <div class="card">
+    ${i.nama}<br>
+    ${i.qty} x ${i.harga}<br>
+    Rp ${sub}
+   </div>
+  `;
+ });
 
-  document.getElementById("keranjang").innerHTML = html;
-  document.getElementById("total").innerText = total;
+ document.getElementById("keranjang").innerHTML=html;
+ document.getElementById("total").innerText=total;
 }
 
-// BUAT STRUK
-function buatStruk() {
-  let now = new Date();
-  let html = `
-    <div class="struk">
-      <center>
-        <h3>Toko Kamu</h3>
-        <p>Manokwari</p>
-      </center>
-      <hr>
-      ${now.toLocaleString()}
-      <hr>
-  `;
+// STRUK
+function buatStruk(){
+ let html=`<div class="struk"><center><h3>Toko Kamu</h3></center><hr>`;
 
-  keranjang.forEach(item => {
-    html += `
-      ${item.nama}<br>
-      ${item.qty} x ${item.harga} = ${item.qty * item.harga}<br>
-    `;
-  });
+ keranjang.forEach(i=>{
+  html+=`${i.nama}<br>${i.qty} x ${i.harga}<br>`;
+ });
 
-  html += `
-      <hr>
-      Total: Rp ${document.getElementById("total").innerText}
-      <br><br>
-      Terimakasih
-    </div>
-  `;
+ html+=`<hr>Total: Rp ${document.getElementById("total").innerText}<br>Terimakasih</div>`;
 
-  document.getElementById("struk").innerHTML = html;
+ document.getElementById("struk").innerHTML=html;
 }
 
-// LOAD AWAL
 loadCatalog();
 
 </script>
