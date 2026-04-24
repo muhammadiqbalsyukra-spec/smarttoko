@@ -45,6 +45,9 @@ button {padding:8px; border:none; border-radius:6px; margin-top:5px;}
 
 <div id="hasil"></div>
 
+<h3>Daftar Produk</h3>
+<div id="listProduk"></div>
+
 <h3>Riwayat Transaksi</h3>
 <div id="riwayat"></div>
 
@@ -61,7 +64,7 @@ function save(){
  localStorage.setItem("history", JSON.stringify(history));
 }
 
-// BARCODE AUTO
+// AUTO BARCODE
 function genBarcode(){
  return Date.now().toString();
 }
@@ -85,12 +88,13 @@ function tambahProduk(){
  document.getElementById("barcodeInput").value="";
  document.getElementById("stok").value="";
 
+ renderProduk();
  renderHistory();
 
  alert("Produk tersimpan ✅");
 }
 
-// CARI PRODUK
+// CARI
 function cariProduk(e){
  if(e.key==="Enter"){
   tampilProduk(document.getElementById("search").value);
@@ -128,7 +132,7 @@ function tampilProduk(code){
  },100);
 }
 
-// STOK MASUK
+// MASUK
 function masuk(code){
  let qty = parseInt(document.getElementById("qty").value);
  let p = db.find(x=>x.barcode===code);
@@ -149,10 +153,11 @@ function masuk(code){
 
  save();
  tampilProduk(code);
+ renderProduk();
  renderHistory();
 }
 
-// STOK KELUAR
+// KELUAR
 function keluar(code){
  let qty = parseInt(document.getElementById("qty").value);
  let p = db.find(x=>x.barcode===code);
@@ -173,7 +178,29 @@ function keluar(code){
 
  save();
  tampilProduk(code);
+ renderProduk();
  renderHistory();
+}
+
+// LIST PRODUK
+function renderProduk(){
+ let html="";
+
+ if(db.length === 0){
+  html = "Belum ada produk";
+ } else {
+  db.forEach(p=>{
+    html += `
+    <div class="card">
+      <b>${p.nama}</b><br>
+      🏷 ${p.barcode}<br>
+      📦 ${p.stok} ${p.satuan}
+    </div>
+    `;
+  });
+ }
+
+ document.getElementById("listProduk").innerHTML = html;
 }
 
 // RIWAYAT
@@ -205,7 +232,7 @@ function startScanner(){
  );
 }
 
-// PRINT STRUK THERMAL 58MM
+// PRINT STRUK 58MM
 function printStruk(code){
  let p = db.find(x=>x.barcode===code);
 
@@ -254,7 +281,7 @@ function printStruk(code){
  win.document.close();
 }
 
-// PRINT BARCODE (FIX)
+// PRINT BARCODE
 function printBarcode(code){
  let win = window.open("","","width=300,height=400");
 
@@ -280,6 +307,7 @@ function printBarcode(code){
 }
 
 // LOAD AWAL
+renderProduk();
 renderHistory();
 
 </script>
