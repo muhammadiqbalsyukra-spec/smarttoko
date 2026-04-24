@@ -122,6 +122,7 @@ function tampilProduk(code){
 
     <button onclick="printStruk('${p.barcode}')">Print Struk</button>
     <button onclick="printBarcode('${p.barcode}')">Print Barcode</button>
+    <button onclick="printLabel('${p.barcode}')">Print Label</button>
 
     <svg id="bcode"></svg>
   </div>
@@ -281,6 +282,7 @@ function printStruk(code){
  win.document.close();
 }
 
+// PRINT BARCODE
 function printBarcode(code){
  let win = window.open("", "", "width=300,height=400");
 
@@ -288,37 +290,27 @@ function printBarcode(code){
   <html>
   <head>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode"><\/script>
-    <style>
-      body{
-        text-align:center;
-        margin-top:30px;
-        font-family: Arial;
-      }
-    </style>
   </head>
 
-  <body>
+  <body style="text-align:center; margin-top:30px; font-family:Arial;">
 
     <svg id="barcode"></svg>
     <div>${code}</div>
 
     <script>
-      function generate(){
-        JsBarcode("#barcode", "${code}", {
-          format: "CODE128",
-          width: 2,
-          height: 60,
-          displayValue: true
-          fontSize: 14
-        });
-      }
-
       window.onload = function(){
-        generate();
-        setTimeout(function(){
+        JsBarcode("#barcode", "${code}", {
+          format:"CODE128",
+          width:2,
+          height:60,
+          displayValue:true,
+          fontSize:14
+        });
+
+        setTimeout(()=>{
           window.print();
           window.close();
-        }, 700);
+        },700);
       }
     <\/script>
 
@@ -328,14 +320,53 @@ function printBarcode(code){
 
  win.document.close();
 }
+
+// PRINT LABEL (BARCODE + NAMA)
+function printLabel(code){
+ let p = db.find(x=>x.barcode===code);
+
+ let win = window.open("", "", "width=300,height=200");
+
+ win.document.write(`
+  <html>
+  <head>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode"><\/script>
+    <style>
+      body{text-align:center; font-family:Arial; margin:5px;}
+      .nama{font-size:12px; font-weight:bold;}
+    </style>
+  </head>
+
+  <body>
+
+    <div class="nama">${p.nama}</div>
+    <svg id="barcode"></svg>
+    <div style="font-size:10px">${p.barcode}</div>
+
+    <script>
+      window.onload = function(){
+        JsBarcode("#barcode", "${p.barcode}", {
+          format:"CODE128",
+          width:2,
+          height:40,
+          displayValue:false
+        });
+
+        setTimeout(()=>{
+          window.print();
+          window.close();
+        },500);
+      }
     <\/script>
+
   </body>
   </html>
  `);
 
  win.document.close();
 }
-// LOAD AWAL (FIX)
+
+// LOAD AWAL
 window.onload = function(){
  renderProduk();
  renderHistory();
