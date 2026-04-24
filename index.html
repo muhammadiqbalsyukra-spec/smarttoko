@@ -3,269 +3,146 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SmartToko Pro</title>
+<title>sesuai kebutuhan</title>
 
 <style>
-body { font-family: Arial; margin:0; background:#f1f5f9;}
-header { background:#0f172a; color:white; padding:15px; text-align:center;}
-.container { padding:15px;}
-.grid { display:grid; grid-template-columns:repeat(2,1fr); gap:15px;}
-.card { background:white; border-radius:12px; padding:10px;}
-.card img { width:100%; height:120px; object-fit:cover; border-radius:10px;}
-input, select, button { width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #ddd;}
-button { background:#22c55e; color:white; border:none;}
-.total { color:green; font-weight:bold;}
-</style>
-</head>
+body {
+  font-family: Arial;
+  background: #f5f5f5;
+  padding: 10px;
+}
 
+.container {
+  max-width: 500px;
+  margin: auto;
+}
+
+input {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.card {
+  background: white;
+  padding: 10px;
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+button {
+  padding: 10px;
+  border: none;
+  background: green;
+  color: white;
+  border-radius: 8px;
+}
+
+.struk {
+  background: white;
+  padding: 15px;
+  font-size: 14px;
+}
+</style>
+
+</head>
 <body>
 
-<header>
-<h2>🛒 SmartToko Pro</h2>
-</header>
+<div class="container">
 
-<div class="container" id="loginBox">
-  <h3>Login Admin</h3>
-  <input id="email" placeholder="Email">
-  <input id="password" type="password" placeholder="Password">
-  <button onclick="login()">Login</button>
-</div>
+<h2>Kasir Toko</h2>
 
-<div class="container" id="app" style="display:none;">
+<input type="text" id="barcode" placeholder="Scan / ketik barcode..." onkeyup="cariProduk(event)">
 
-<button onclick="logout()">Logout</button>
+<div id="keranjang"></div>
 
-<h3>Tambah Produk</h3>
+<h3>Total: Rp <span id="total">0</span></h3>
 
-<input id="nama" placeholder="Nama Produk">
-<input id="harga_pcs" type="number" placeholder="Harga PCS">
-<input id="harga_crt" type="number" placeholder="Harga CRT">
-<input id="isi_crt" type="number" placeholder="Isi per CRT">
-<input id="stok" type="number" placeholder="Stok">
-<input id="foto" placeholder="Link Foto">
+<button onclick="buatStruk()">Cetak Struk</button>
 
-<button onclick="kirimData()">Tambah</button>
-
-<h3>Daftar Produk</h3>
-<div id="list" class="grid"></div>
-
-<h3>Laporan Penjualan</h3>
-<div id="laporan"></div>
+<div id="struk"></div>
 
 </div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+<script>
+let produkDB = [
+  {barcode: "111", nama: "Indomie Goreng", harga: 3000},
+  {barcode: "222", nama: "Teh Botol", harga: 5000},
+  {barcode: "333", nama: "Sosis Belfood", harga: 27000}
+];
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBYkPd9KaoJoSEAhO2BsVz8P76GnNJuVnY",
-  authDomain: "smarttoko-cfa75.firebaseapp.com",
-  projectId: "smarttoko-cfa75",
-  storageBucket: "smarttoko-cfa75.appspot.com",
-  messagingSenderId: "408497647205",
-  appId: "1:408497647205:web:cedd0b3ec9775c4897e08c"
-};
+let keranjang = [];
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
+function cariProduk(e) {
+  if (e.key === "Enter") {
+    let kode = document.getElementById("barcode").value;
+    let produk = produkDB.find(p => p.barcode === kode);
 
-let produk = [];
+    if (produk) {
+      tambahKeranjang(produk);
+    } else {
+      alert("Produk tidak ditemukan");
+    }
 
-// LOGIN
-window.login = async function(){
-  let email = document.getElementById("email").value.trim();
-  let password = document.getElementById("password").value.trim();
-
-  if(!email || !password){
-    alert("Isi email dan password!");
-    return;
-  }
-
-  try {
-    await signInWithEmailAndPassword(auth, email, password);
-  } catch(e){
-    alert("Login gagal: " + e.message);
+    document.getElementById("barcode").value = "";
   }
 }
 
-// LOGOUT
-window.logout = function(){
-  signOut(auth);
-}
+function tambahKeranjang(produk) {
+  let item = keranjang.find(i => i.barcode === produk.barcode);
 
-// CEK LOGIN
-onAuthStateChanged(auth, (user) => {
-  if(user){
-    document.getElementById("loginBox").style.display = "none";
-    document.getElementById("app").style.display = "block";
-    ambilData();
-    loadLaporan();
+  if (item) {
+    item.qty++;
   } else {
-    document.getElementById("loginBox").style.display = "block";
-    document.getElementById("app").style.display = "none";
+    keranjang.push({...produk, qty:1});
   }
-});
 
-// AMBIL PRODUK
-function ambilData(){
-  onSnapshot(collection(db, "produk"), (snapshot) => {
-    produk = [];
-    snapshot.forEach(doc => {
-      produk.push({ id: doc.id, ...doc.data() });
-    });
-    tampil();
-  });
+  renderKeranjang();
 }
 
-// TAMPIL PRODUK
-function tampil(){
+function renderKeranjang() {
   let html = "";
+  let total = 0;
 
-  produk.forEach((p,i)=>{
+  keranjang.forEach(item => {
+    let subtotal = item.harga * item.qty;
+    total += subtotal;
+
     html += `
-    <div class="card">
-      <img src="${p.foto || 'https://via.placeholder.com/150'}">
-      <h4>${p.nama}</h4>
-
-      <p>PCS: Rp ${p.harga_pcs}</p>
-      <p>CRT: Rp ${p.harga_crt}</p>
-      <p>Stok: ${p.stok}</p>
-
-      <select onchange="hitung(${i})" id="mode${i}">
-        <option value="pcs">PCS</option>
-        <option value="crt">CRT</option>
-      </select>
-
-      <input type="number" placeholder="Qty" oninput="hitung(${i})" id="qty${i}">
-      <p class="total" id="total${i}">Rp 0</p>
-
-      <button onclick="jual(${i})">Jual</button>
-      <button onclick="share(${i})">Share</button>
-      <button onclick="hapus(${i})" style="background:red;">Hapus</button>
-    </div>
+      <div class="card">
+        ${item.nama} x ${item.qty} <br>
+        Rp ${subtotal}
+      </div>
     `;
   });
 
-  document.getElementById("list").innerHTML = html;
+  document.getElementById("keranjang").innerHTML = html;
+  document.getElementById("total").innerText = total;
 }
 
-// HITUNG
-window.hitung = function(i){
-  let p = produk[i];
-  let qty = parseInt(document.getElementById("qty"+i).value || 0);
-  let mode = document.getElementById("mode"+i).value;
+function buatStruk() {
+  let html = `
+    <div class="struk">
+      <h3>Karismu Shop</h3>
+      <hr>
+  `;
 
-  let total = mode === "pcs"
-    ? qty * p.harga_pcs
-    : qty * p.harga_crt;
-
-  document.getElementById("total"+i).innerText = "Rp " + total;
-}
-
-// JUAL
-window.jual = async function(i){
-  let p = produk[i];
-  let qty = parseInt(document.getElementById("qty"+i).value || 0);
-  let mode = document.getElementById("mode"+i).value;
-
-  if(qty <= 0){
-    alert("Isi qty dulu!");
-    return;
-  }
-
-  let keluarPCS = mode === "pcs" ? qty : qty * p.isi_crt;
-
-  if(p.stok < keluarPCS){
-    alert("Stok tidak cukup!");
-    return;
-  }
-
-  let stokBaru = p.stok - keluarPCS;
-
-  await updateDoc(doc(db, "produk", p.id), {
-    stok: stokBaru
+  keranjang.forEach(item => {
+    html += `
+      ${item.nama} x ${item.qty} <br>
+      Rp ${item.harga * item.qty} <br>
+    `;
   });
 
-  await addDoc(collection(db, "penjualan"), {
-    nama: p.nama,
-    qty: qty,
-    mode: mode,
-    total: mode === "pcs" ? qty * p.harga_pcs : qty * p.harga_crt,
-    waktu: new Date()
-  });
+  html += `
+      <hr>
+      Total: Rp ${document.getElementById("total").innerText}
+      <br><br>
+      Terimakasih
+    </div>
+  `;
 
-  alert("Penjualan berhasil!");
-}
-
-// HAPUS PRODUK
-window.hapus = async function(i){
-  let p = produk[i];
-
-  let konfirmasi = confirm("Yakin hapus produk ini?");
-  if(!konfirmasi) return;
-
-  try{
-    await deleteDoc(doc(db, "produk", p.id));
-    alert("Produk berhasil dihapus!");
-  }catch(e){
-    alert("Gagal hapus!");
-  }
-}
-
-// SHARE
-window.share = function(i){
-  let p = produk[i];
-  let text = `🛒 ${p.nama}\nRp ${p.harga_pcs}`;
-  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`);
-}
-
-// TAMBAH PRODUK
-window.kirimData = async function(){
-  let nama = document.getElementById("nama").value.trim();
-
-  if(!nama){
-    alert("Nama produk wajib diisi!");
-    return;
-  }
-
-  let p = {
-    nama,
-    harga_pcs: parseInt(document.getElementById("harga_pcs").value || 0),
-    harga_crt: parseInt(document.getElementById("harga_crt").value || 0),
-    isi_crt: parseInt(document.getElementById("isi_crt").value || 0),
-    stok: parseInt(document.getElementById("stok").value || 0),
-    foto: document.getElementById("foto").value
-  };
-
-  await addDoc(collection(db,"produk"), p);
-  alert("Produk ditambahkan!");
-}
-
-// LAPORAN
-function loadLaporan(){
-  onSnapshot(collection(db, "penjualan"), (snapshot) => {
-    let html = "";
-    let total = 0;
-
-    snapshot.forEach(doc => {
-      let d = doc.data();
-      total += d.total;
-
-      html += `
-      <div class="card">
-        <b>${d.nama}</b><br>
-        Qty: ${d.qty} (${d.mode})<br>
-        Total: Rp ${d.total}
-      </div>
-      `;
-    });
-
-    html += `<h3>Total: Rp ${total}</h3>`;
-    document.getElementById("laporan").innerHTML = html;
-  });
+  document.getElementById("struk").innerHTML = html;
 }
 </script>
 
