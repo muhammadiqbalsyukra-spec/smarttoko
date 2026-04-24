@@ -3,260 +3,274 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kasir Modern Lengkap</title>
+<title>Stok Toko Pro</title>
 
-<!-- LIBRARY -->
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
 
 <style>
-body {font-family: Arial; background:#f2f2f2; margin:0;}
-header {background:#2c7be5; color:white; padding:15px; text-align:center;}
+body {font-family: Arial; background:#f5f5f5; margin:0;}
+header {background:#28a745; color:white; padding:15px; text-align:center;}
 .container {padding:10px; max-width:600px; margin:auto;}
 input, select {width:100%; padding:10px; margin-bottom:8px;}
-.grid {display:grid; grid-template-columns:repeat(2,1fr); gap:10px;}
-.card {background:white; padding:10px; border-radius:10px;}
-button {padding:6px; margin-top:5px; border:none; border-radius:6px;}
-.btn-add{background:green;color:white;}
-.btn-edit{background:orange;color:white;}
-.btn-del{background:red;color:white;}
-.struk{background:white;padding:15px;margin-top:10px;font-size:13px;}
+.card {background:white; padding:10px; border-radius:10px; margin-bottom:10px;}
+button {padding:8px; border:none; border-radius:6px; margin-top:5px;}
+.btn {background:green; color:white;}
+.btn-out {background:red; color:white;}
 </style>
 </head>
 
 <body>
 
-<header><h2>Kasir Modern Lengkap</h2></header>
+<header><h2>Stok Toko Pro</h2></header>
 
 <div class="container">
 
-<!-- FORM -->
 <div class="card">
-<h3>Input Produk</h3>
-<input type="hidden" id="editIndex">
-
-<input type="text" id="namaBarang" placeholder="Nama barang">
-<input type="number" id="hargaBarang" placeholder="Harga">
-<input type="number" id="stokBarang" placeholder="Stok">
-
-<select id="ukuran">
-<option value="">Ukuran</option>
-<option>S</option><option>M</option><option>L</option><option>XL</option>
+<h3>Tambah Produk</h3>
+<input id="nama" placeholder="Nama barang">
+<input id="barcodeInput" placeholder="Barcode (auto jika kosong)">
+<select id="satuan">
+<option>PCS</option>
+<option>CRT</option>
 </select>
-
-<select id="warna">
-<option value="">Warna</option>
-<option>Merah</option><option>Biru</option><option>Hitam</option><option>Putih</option>
-</select>
-
-<button class="btn-add" onclick="simpanProduk()">Simpan Produk</button>
+<input type="number" id="stok" placeholder="Stok awal">
+<button class="btn" onclick="tambahProduk()">Simpan</button>
 </div>
 
-<!-- SCAN -->
 <button onclick="startScanner()">Scan Barcode</button>
 <div id="reader"></div>
 
-<input type="text" id="barcode" placeholder="Scan / ketik barcode..." onkeyup="cariProduk(event)">
+<input id="search" placeholder="Cari barcode..." onkeyup="cariProduk(event)">
 
-<h3>Catalog</h3>
-<div class="grid" id="catalog"></div>
+<div id="hasil"></div>
 
-<h3>Keranjang</h3>
-<div id="keranjang"></div>
-
-<h3>Total: Rp <span id="total">0</span></h3>
-<button onclick="buatStruk()">Cetak Struk</button>
-
-<div id="struk"></div>
+<h3>Riwayat Transaksi</h3>
+<div id="riwayat"></div>
 
 </div>
 
 <script>
 
-let produkDB = [];
-let keranjang = [];
+let db = JSON.parse(localStorage.getItem("db")) || [];
+let history = JSON.parse(localStorage.getItem("history")) || [];
 
-// GENERATE BARCODE
-function generateBarcode(){
+// SAVE
+function save(){
+ localStorage.setItem("db", JSON.stringify(db));
+ localStorage.setItem("history", JSON.stringify(history));
+}
+
+// BARCODE AUTO
+function genBarcode(){
  return Date.now().toString();
 }
 
-// LOAD CATALOG
-function loadCatalog(){
- let html="";
- produkDB.forEach((p,i)=>{
-  html+=`
-   <div class="card">
-     <b>${p.nama}</b><br>
-     Rp ${p.harga}<br>
-     Stok: ${p.stok}<br>
-     ${p.ukuran} | ${p.warna}<br>
+// TAMBAH PRODUK
+function tambahProduk(){
+ let nama = document.getElementById("nama").value;
+ let barcode = document.getElementById("barcodeInput").value || genBarcode();
+ let satuan = document.getElementById("satuan").value;
+ let stok = parseInt(document.getElementById("stok").value);
 
-     <svg id="barcode${i}"></svg>
-
-     <button class="btn-add" onclick="tambahKeranjang('${p.barcode}')">Tambah</button>
-     <button onclick="printBarcode('${p.barcode}')">Print</button>
-     <button class="btn-edit" onclick="editProduk(${i})">Edit</button>
-     <button class="btn-del" onclick="hapusProduk(${i})">Hapus</button>
-   </div>
-  `;
- });
-
- document.getElementById("catalog").innerHTML=html;
-
- produkDB.forEach((p,i)=>{
-   JsBarcode(`#barcode${i}`, p.barcode);
- });
-}
-
-// SIMPAN
-function simpanProduk(){
- let nama=document.getElementById("namaBarang").value;
- let harga=parseInt(document.getElementById("hargaBarang").value);
- let stok=parseInt(document.getElementById("stokBarang").value);
- let ukuran=document.getElementById("ukuran").value||"-";
- let warna=document.getElementById("warna").value||"-";
- let editIndex=document.getElementById("editIndex").value;
-
- if(!nama||!harga||!stok){
-  alert("Lengkapi data!");
+ if(!nama || !stok){
+  alert("Lengkapi data");
   return;
  }
 
- if(editIndex===""){
-  produkDB.push({
-    barcode:generateBarcode(),
-    nama,harga,stok,ukuran,warna
-  });
- }else{
-  produkDB[editIndex]={...produkDB[editIndex],nama,harga,stok,ukuran,warna};
- }
+ db.push({nama, barcode, satuan, stok});
+ save();
 
- resetForm();
- loadCatalog();
+ document.getElementById("nama").value="";
+ document.getElementById("barcodeInput").value="";
+ document.getElementById("stok").value="";
+
+ renderHistory();
+
+ alert("Produk tersimpan ✅");
 }
 
-// EDIT
-function editProduk(i){
- let p=produkDB[i];
- document.getElementById("editIndex").value=i;
- document.getElementById("namaBarang").value=p.nama;
- document.getElementById("hargaBarang").value=p.harga;
- document.getElementById("stokBarang").value=p.stok;
- document.getElementById("ukuran").value=p.ukuran;
- document.getElementById("warna").value=p.warna;
-}
-
-// HAPUS
-function hapusProduk(i){
- if(confirm("Hapus produk?")){
-  produkDB.splice(i,1);
-  loadCatalog();
- }
-}
-
-// RESET
-function resetForm(){
- document.getElementById("editIndex").value="";
- document.getElementById("namaBarang").value="";
- document.getElementById("hargaBarang").value="";
- document.getElementById("stokBarang").value="";
- document.getElementById("ukuran").value="";
- document.getElementById("warna").value="";
-}
-
-// SCAN CAMERA
-function startScanner(){
- const scanner = new Html5Qrcode("reader");
-
- scanner.start(
-  { facingMode: "environment" },
-  { fps: 10, qrbox: 250 },
-  (decodedText) => {
-    document.getElementById("barcode").value = decodedText;
-    tambahKeranjang(decodedText);
-    scanner.stop();
-    document.getElementById("reader").innerHTML="";
-  }
- ).catch(()=> alert("Kamera error"));
-}
-
-// BARCODE INPUT
+// CARI PRODUK
 function cariProduk(e){
  if(e.key==="Enter"){
-  tambahKeranjang(document.getElementById("barcode").value);
-  document.getElementById("barcode").value="";
+  tampilProduk(document.getElementById("search").value);
  }
 }
 
-// TAMBAH KE KERANJANG
-function tambahKeranjang(barcode){
- let p=produkDB.find(x=>x.barcode===barcode);
+// TAMPIL PRODUK
+function tampilProduk(code){
+ let p = db.find(x=>x.barcode===code);
 
- if(!p){alert("Tidak ditemukan");return;}
- if(p.stok<=0){alert("Stok habis");return;}
+ if(!p){
+  document.getElementById("hasil").innerHTML="Tidak ditemukan";
+  return;
+ }
 
- p.stok--;
+ document.getElementById("hasil").innerHTML=`
+  <div class="card">
+    <b>${p.nama}</b><br>
+    Stok: ${p.stok} ${p.satuan}<br>
 
- let item=keranjang.find(i=>i.barcode===barcode);
+    <input id="qty" type="number" placeholder="Jumlah">
 
- if(item){item.qty++;}
- else{keranjang.push({...p,qty:1});}
+    <button class="btn" onclick="masuk('${p.barcode}')">Masuk</button>
+    <button class="btn-out" onclick="keluar('${p.barcode}')">Keluar</button>
 
- renderKeranjang();
- loadCatalog();
+    <button onclick="printStruk('${p.barcode}')">Print Struk</button>
+    <button onclick="printBarcode('${p.barcode}')">Print Barcode</button>
+
+    <svg id="bcode"></svg>
+  </div>
+ `;
+
+ setTimeout(()=>{
+   JsBarcode("#bcode", p.barcode);
+ },100);
 }
 
-// RENDER
-function renderKeranjang(){
+// STOK MASUK
+function masuk(code){
+ let qty = parseInt(document.getElementById("qty").value);
+ let p = db.find(x=>x.barcode===code);
+
+ if(!qty){
+  alert("Isi jumlah");
+  return;
+ }
+
+ p.stok += qty;
+
+ history.push({
+  tipe:"MASUK",
+  nama:p.nama,
+  qty,
+  waktu:new Date().toLocaleString()
+ });
+
+ save();
+ tampilProduk(code);
+ renderHistory();
+}
+
+// STOK KELUAR
+function keluar(code){
+ let qty = parseInt(document.getElementById("qty").value);
+ let p = db.find(x=>x.barcode===code);
+
+ if(!qty || p.stok < qty){
+  alert("Stok tidak cukup");
+  return;
+ }
+
+ p.stok -= qty;
+
+ history.push({
+  tipe:"KELUAR",
+  nama:p.nama,
+  qty,
+  waktu:new Date().toLocaleString()
+ });
+
+ save();
+ tampilProduk(code);
+ renderHistory();
+}
+
+// RIWAYAT
+function renderHistory(){
  let html="";
- let total=0;
-
- keranjang.forEach(i=>{
-  let sub=i.qty*i.harga;
-  total+=sub;
-
+ history.slice().reverse().forEach(h=>{
   html+=`
    <div class="card">
-    ${i.nama}<br>
-    ${i.qty} x ${i.harga}<br>
-    Rp ${sub}
+    ${h.tipe} - ${h.nama}<br>
+    ${h.qty}<br>
+    ${h.waktu}
    </div>
   `;
  });
-
- document.getElementById("keranjang").innerHTML=html;
- document.getElementById("total").innerText=total;
+ document.getElementById("riwayat").innerHTML=html;
 }
 
-// STRUK
-function buatStruk(){
- let html=`<div class="struk"><center><h3>Toko Kamu</h3></center><hr>`;
+// SCANNER
+function startScanner(){
+ const scanner = new Html5Qrcode("reader");
 
- keranjang.forEach(i=>{
-  html+=`${i.nama}<br>${i.qty} x ${i.harga}<br>`;
- });
-
- html+=`<hr>Total: Rp ${document.getElementById("total").innerText}<br>Terimakasih</div>`;
-
- document.getElementById("struk").innerHTML=html;
+ scanner.start({facingMode:"environment"},{fps:10,qrbox:250},
+  (text)=>{
+    document.getElementById("search").value=text;
+    tampilProduk(text);
+    scanner.stop();
+    document.getElementById("reader").innerHTML="";
+  }
+ );
 }
 
-// PRINT BARCODE
+// PRINT STRUK THERMAL 58MM
+function printStruk(code){
+ let p = db.find(x=>x.barcode===code);
+
+ let win = window.open("", "", "width=300,height=600");
+
+ win.document.write(`
+  <html>
+  <head>
+    <style>
+      body{
+        font-family: monospace;
+        width:220px;
+        margin:0;
+        padding:10px;
+        font-size:12px;
+      }
+      .center{text-align:center;}
+      .line{border-top:1px dashed #000; margin:5px 0;}
+      .bold{font-weight:bold;}
+    </style>
+  </head>
+
+  <body onload="window.print();window.close();">
+
+    <div class="center bold">TOKO ANDA</div>
+    <div class="center">Sorong</div>
+
+    <div class="line"></div>
+
+    Nama : ${p.nama}<br>
+    Barcode : ${p.barcode}<br>
+    Stok : ${p.stok} ${p.satuan}<br>
+
+    <div class="line"></div>
+
+    ${new Date().toLocaleString()}
+
+    <div class="line"></div>
+
+    <div class="center">Terima Kasih</div>
+
+  </body>
+  </html>
+ `);
+
+ win.document.close();
+}
+
+// PRINT BARCODE (FIX)
 function printBarcode(code){
- let win = window.open("", "", "width=300,height=400");
+ let win = window.open("","","width=300,height=400");
 
  win.document.write(`
   <html>
   <head>
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode"><\/script>
   </head>
-  <body style="text-align:center;">
+  <body>
     <svg id="b"></svg>
-    <p>${code}</p>
+
     <script>
-      JsBarcode("#b","${code}");
-      window.print();
+      window.onload = function(){
+        JsBarcode("#b","${code}");
+        setTimeout(()=>{ window.print(); },500);
+      }
     <\/script>
   </body>
   </html>
@@ -264,6 +278,9 @@ function printBarcode(code){
 
  win.document.close();
 }
+
+// LOAD AWAL
+renderHistory();
 
 </script>
 
