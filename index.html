@@ -281,21 +281,53 @@ function printStruk(code){
  win.document.close();
 }
 
-// PRINT BARCODE
 function printBarcode(code){
- let win = window.open("","","width=300,height=400");
+ let win = window.open("", "", "width=300,height=400");
 
  win.document.write(`
   <html>
   <head>
-  <script src="https://cdn.jsdelivr.net/npm/jsbarcode"><\/script>
-  </head>
-  <body>
-  <script>
-      window.onload = function(){
-        JsBarcode("#b","${code}");
-        setTimeout(()=>{ window.print(); },500);
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode"><\/script>
+    <style>
+      body{
+        text-align:center;
+        margin-top:30px;
+        font-family: Arial;
       }
+    </style>
+  </head>
+
+  <body>
+
+    <svg id="barcode"></svg>
+    <div>${code}</div>
+
+    <script>
+      function generate(){
+        JsBarcode("#barcode", "${code}", {
+          format: "CODE128",
+          width: 2,
+          height: 60,
+          displayValue: true
+          fontSize: 14
+        });
+      }
+
+      window.onload = function(){
+        generate();
+        setTimeout(function(){
+          window.print();
+          window.close();
+        }, 700);
+      }
+    <\/script>
+
+  </body>
+  </html>
+ `);
+
+ win.document.close();
+}
     <\/script>
   </body>
   </html>
