@@ -291,9 +291,7 @@ function printBarcode(code){
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode"><\/script>
   </head>
   <body>
-    <svg id="b"></svg>
-
-    <script>
+  <script>
       window.onload = function(){
         JsBarcode("#b","${code}");
         setTimeout(()=>{ window.print(); },500);
@@ -305,10 +303,11 @@ function printBarcode(code){
 
  win.document.close();
 }
-
-// LOAD AWAL
-renderProduk();
-renderHistory();
+// LOAD AWAL (FIX)
+window.onload = function(){
+ renderProduk();
+ renderHistory();
+}
 
 </script>
 
