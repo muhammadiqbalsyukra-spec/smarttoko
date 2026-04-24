@@ -3,17 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>sesuai kebutuhan</title>
+<title>Toko Kasir Modern</title>
 
 <style>
 body {
   font-family: Arial;
-  background: #f5f5f5;
-  padding: 10px;
+  background: #f2f2f2;
+  margin: 0;
+}
+
+header {
+  background: #2c7be5;
+  color: white;
+  padding: 15px;
+  text-align: center;
 }
 
 .container {
-  max-width: 500px;
+  padding: 10px;
+  max-width: 600px;
   margin: auto;
 }
 
@@ -23,38 +31,60 @@ input {
   margin-bottom: 10px;
 }
 
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
 .card {
   background: white;
   padding: 10px;
   border-radius: 10px;
-  margin-bottom: 10px;
+  text-align: center;
+}
+
+.card img {
+  width: 80px;
 }
 
 button {
-  padding: 10px;
-  border: none;
+  padding: 8px;
   background: green;
   color: white;
-  border-radius: 8px;
+  border: none;
+  border-radius: 6px;
+  margin-top: 5px;
+}
+
+.keranjang {
+  margin-top: 10px;
 }
 
 .struk {
   background: white;
   padding: 15px;
-  font-size: 14px;
+  margin-top: 15px;
+  font-size: 13px;
 }
 </style>
 
 </head>
 <body>
 
-<div class="container">
+<header>
+  <h2>Toko Kasir Modern</h2>
+</header>
 
-<h2>Kasir Toko</h2>
+<div class="container">
 
 <input type="text" id="barcode" placeholder="Scan / ketik barcode..." onkeyup="cariProduk(event)">
 
-<div id="keranjang"></div>
+<h3>Catalog</h3>
+<div class="grid" id="catalog"></div>
+
+<h3>Keranjang</h3>
+<div id="keranjang" class="keranjang"></div>
 
 <h3>Total: Rp <span id="total">0</span></h3>
 
@@ -65,31 +95,52 @@ button {
 </div>
 
 <script>
+
+// DATABASE PRODUK (sementara)
 let produkDB = [
-  {barcode: "111", nama: "Indomie Goreng", harga: 3000},
-  {barcode: "222", nama: "Teh Botol", harga: 5000},
-  {barcode: "333", nama: "Sosis Belfood", harga: 27000}
+  {barcode:"111", nama:"Indomie Goreng", harga:3000, gambar:"images/indomie.jpg"},
+  {barcode:"222", nama:"Teh Botol", harga:5000, gambar:"images/teh.jpg"},
+  {barcode:"333", nama:"Sosis Belfood", harga:27000, gambar:"images/sosis.jpg"},
+  {barcode:"444", nama:"Sunlight", harga:15000, gambar:"images/sunlight.jpg"}
 ];
 
 let keranjang = [];
 
+// TAMPILKAN CATALOG
+function loadCatalog() {
+  let html = "";
+  produkDB.forEach(p => {
+    html += `
+      <div class="card">
+        <img src="${p.gambar}">
+        <h4>${p.nama}</h4>
+        <p>Rp ${p.harga}</p>
+        <button onclick="tambahKeranjang('${p.barcode}')">Tambah</button>
+      </div>
+    `;
+  });
+  document.getElementById("catalog").innerHTML = html;
+}
+
+// CARI PRODUK DARI BARCODE
 function cariProduk(e) {
   if (e.key === "Enter") {
     let kode = document.getElementById("barcode").value;
-    let produk = produkDB.find(p => p.barcode === kode);
-
-    if (produk) {
-      tambahKeranjang(produk);
-    } else {
-      alert("Produk tidak ditemukan");
-    }
-
+    tambahKeranjang(kode);
     document.getElementById("barcode").value = "";
   }
 }
 
-function tambahKeranjang(produk) {
-  let item = keranjang.find(i => i.barcode === produk.barcode);
+// TAMBAH KE KERANJANG
+function tambahKeranjang(barcode) {
+  let produk = produkDB.find(p => p.barcode === barcode);
+
+  if (!produk) {
+    alert("Produk tidak ditemukan");
+    return;
+  }
+
+  let item = keranjang.find(i => i.barcode === barcode);
 
   if (item) {
     item.qty++;
@@ -100,6 +151,7 @@ function tambahKeranjang(produk) {
   renderKeranjang();
 }
 
+// RENDER KERANJANG
 function renderKeranjang() {
   let html = "";
   let total = 0;
@@ -120,17 +172,24 @@ function renderKeranjang() {
   document.getElementById("total").innerText = total;
 }
 
+// BUAT STRUK
 function buatStruk() {
+  let now = new Date();
   let html = `
     <div class="struk">
-      <h3>Karismu Shop</h3>
+      <center>
+        <h3>Toko Kamu</h3>
+        <p>Manokwari</p>
+      </center>
+      <hr>
+      ${now.toLocaleString()}
       <hr>
   `;
 
   keranjang.forEach(item => {
     html += `
-      ${item.nama} x ${item.qty} <br>
-      Rp ${item.harga * item.qty} <br>
+      ${item.nama}<br>
+      ${item.qty} x ${item.harga} = ${item.qty * item.harga}<br>
     `;
   });
 
@@ -144,6 +203,10 @@ function buatStruk() {
 
   document.getElementById("struk").innerHTML = html;
 }
+
+// LOAD AWAL
+loadCatalog();
+
 </script>
 
 </body>
