@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kasir Modern Pro</title>
+<title>Kasir Modern Lengkap</title>
+
+<!-- LIBRARY -->
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
 
 <style>
 body {font-family: Arial; background:#f2f2f2; margin:0;}
@@ -12,7 +16,7 @@ header {background:#2c7be5; color:white; padding:15px; text-align:center;}
 input, select {width:100%; padding:10px; margin-bottom:8px;}
 .grid {display:grid; grid-template-columns:repeat(2,1fr); gap:10px;}
 .card {background:white; padding:10px; border-radius:10px;}
-button {padding:6px; margin-top:5px; border:none; border-radius:6px; cursor:pointer;}
+button {padding:6px; margin-top:5px; border:none; border-radius:6px;}
 .btn-add{background:green;color:white;}
 .btn-edit{background:orange;color:white;}
 .btn-del{background:red;color:white;}
@@ -22,11 +26,11 @@ button {padding:6px; margin-top:5px; border:none; border-radius:6px; cursor:poin
 
 <body>
 
-<header><h2>Kasir Modern Pro</h2></header>
+<header><h2>Kasir Modern Lengkap</h2></header>
 
 <div class="container">
 
-<!-- FORM PRODUK -->
+<!-- FORM -->
 <div class="card">
 <h3>Input Produk</h3>
 <input type="hidden" id="editIndex">
@@ -48,6 +52,10 @@ button {padding:6px; margin-top:5px; border:none; border-radius:6px; cursor:poin
 <button class="btn-add" onclick="simpanProduk()">Simpan Produk</button>
 </div>
 
+<!-- SCAN -->
+<button onclick="startScanner()">Scan Barcode</button>
+<div id="reader"></div>
+
 <input type="text" id="barcode" placeholder="Scan / ketik barcode..." onkeyup="cariProduk(event)">
 
 <h3>Catalog</h3>
@@ -65,13 +73,13 @@ button {padding:6px; margin-top:5px; border:none; border-radius:6px; cursor:poin
 
 <script>
 
-// DATABASE (sementara)
-let produkDB = [
- {barcode:"111", nama:"Indomie", harga:3000, stok:10, ukuran:"-", warna:"-"},
- {barcode:"222", nama:"Teh Botol", harga:5000, stok:8, ukuran:"-", warna:"-"}
-];
-
+let produkDB = [];
 let keranjang = [];
+
+// GENERATE BARCODE
+function generateBarcode(){
+ return Date.now().toString();
+}
 
 // LOAD CATALOG
 function loadCatalog(){
@@ -84,16 +92,24 @@ function loadCatalog(){
      Stok: ${p.stok}<br>
      ${p.ukuran} | ${p.warna}<br>
 
+     <svg id="barcode${i}"></svg>
+
      <button class="btn-add" onclick="tambahKeranjang('${p.barcode}')">Tambah</button>
+     <button onclick="printBarcode('${p.barcode}')">Print</button>
      <button class="btn-edit" onclick="editProduk(${i})">Edit</button>
      <button class="btn-del" onclick="hapusProduk(${i})">Hapus</button>
    </div>
   `;
  });
+
  document.getElementById("catalog").innerHTML=html;
+
+ produkDB.forEach((p,i)=>{
+   JsBarcode(`#barcode${i}`, p.barcode);
+ });
 }
 
-// SIMPAN / UPDATE PRODUK
+// SIMPAN
 function simpanProduk(){
  let nama=document.getElementById("namaBarang").value;
  let harga=parseInt(document.getElementById("hargaBarang").value);
@@ -109,7 +125,7 @@ function simpanProduk(){
 
  if(editIndex===""){
   produkDB.push({
-    barcode:Date.now().toString(),
+    barcode:generateBarcode(),
     nama,harga,stok,ukuran,warna
   });
  }else{
@@ -139,7 +155,7 @@ function hapusProduk(i){
  }
 }
 
-// RESET FORM
+// RESET
 function resetForm(){
  document.getElementById("editIndex").value="";
  document.getElementById("namaBarang").value="";
@@ -149,7 +165,23 @@ function resetForm(){
  document.getElementById("warna").value="";
 }
 
-// BARCODE
+// SCAN CAMERA
+function startScanner(){
+ const scanner = new Html5Qrcode("reader");
+
+ scanner.start(
+  { facingMode: "environment" },
+  { fps: 10, qrbox: 250 },
+  (decodedText) => {
+    document.getElementById("barcode").value = decodedText;
+    tambahKeranjang(decodedText);
+    scanner.stop();
+    document.getElementById("reader").innerHTML="";
+  }
+ ).catch(()=> alert("Kamera error"));
+}
+
+// BARCODE INPUT
 function cariProduk(e){
  if(e.key==="Enter"){
   tambahKeranjang(document.getElementById("barcode").value);
@@ -157,7 +189,7 @@ function cariProduk(e){
  }
 }
 
-// TAMBAH KE KERANJANG + KURANGI STOK
+// TAMBAH KE KERANJANG
 function tambahKeranjang(barcode){
  let p=produkDB.find(x=>x.barcode===barcode);
 
@@ -175,7 +207,7 @@ function tambahKeranjang(barcode){
  loadCatalog();
 }
 
-// RENDER KERANJANG
+// RENDER
 function renderKeranjang(){
  let html="";
  let total=0;
@@ -210,7 +242,28 @@ function buatStruk(){
  document.getElementById("struk").innerHTML=html;
 }
 
-loadCatalog();
+// PRINT BARCODE
+function printBarcode(code){
+ let win = window.open("", "", "width=300,height=400");
+
+ win.document.write(`
+  <html>
+  <head>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode"><\/script>
+  </head>
+  <body style="text-align:center;">
+    <svg id="b"></svg>
+    <p>${code}</p>
+    <script>
+      JsBarcode("#b","${code}");
+      window.print();
+    <\/script>
+  </body>
+  </html>
+ `);
+
+ win.document.close();
+}
 
 </script>
 
