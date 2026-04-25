@@ -18,6 +18,7 @@ button {padding:8px; border:none; border-radius:6px; margin-top:5px;}
 .btn {background:green; color:white;}
 .btn-out {background:red; color:white;}
 .btn-del {background:#333; color:white;}
+.total {font-size:18px; font-weight:bold;}
 </style>
 </head>
 
@@ -27,6 +28,7 @@ button {padding:8px; border:none; border-radius:6px; margin-top:5px;}
 
 <div class="container">
 
+<!-- INPUT PRODUK -->
 <div class="card">
 <h3>Tambah Produk</h3>
 <input id="nama" placeholder="Nama barang">
@@ -47,6 +49,12 @@ button {padding:8px; border:none; border-radius:6px; margin-top:5px;}
 
 <div id="hasil"></div>
 
+<!-- KERANJANG -->
+<h3>🛒 Keranjang</h3>
+<div id="cart"></div>
+<div class="total" id="total"></div>
+<button class="btn" onclick="checkout()">Checkout</button>
+
 <h3>Daftar Produk</h3>
 <div id="listProduk"></div>
 
@@ -59,19 +67,17 @@ button {padding:8px; border:none; border-radius:6px; margin-top:5px;}
 
 let db = JSON.parse(localStorage.getItem("db")) || [];
 let history = JSON.parse(localStorage.getItem("history")) || [];
+let cart = [];
 
-// SAVE
 function save(){
  localStorage.setItem("db", JSON.stringify(db));
  localStorage.setItem("history", JSON.stringify(history));
 }
 
-// FORMAT RUPIAH
-function rupiah(angka){
- return "Rp " + angka.toLocaleString("id-ID");
+function rupiah(a){
+ return "Rp " + a.toLocaleString("id-ID");
 }
 
-// AUTO BARCODE
 function genBarcode(){
  return Date.now().toString();
 }
@@ -96,14 +102,12 @@ function tambahProduk(){
 
  db.push({nama, barcode, satuan, stok, harga});
  save();
+ renderProduk();
 
  document.getElementById("nama").value="";
  document.getElementById("barcodeInput").value="";
  document.getElementById("stok").value="";
  document.getElementById("harga").value="";
-
- renderProduk();
- alert("Produk tersimpan ✅");
 }
 
 // CARI
@@ -126,29 +130,21 @@ function tampilProduk(code){
   <div class="card">
     <b>${p.nama}</b><br>
     💰 ${rupiah(p.harga)}<br>
-    📦 ${p.stok} ${p.satuan}<br>
+    📦 ${p.stok}<br>
 
-    <input id="qty" type="number" placeholder="Jumlah beli">
+    <input id="qty" type="number" placeholder="Jumlah">
 
-    <button class="btn" onclick="jual('${p.barcode}')">🛒 Jual</button>
-
-    <button onclick="printStruk('${p.barcode}')">🧾 Struk</button>
-    <button onclick="printBarcode('${p.barcode}')">🏷 Barcode</button>
-    <button onclick="printLabel('${p.barcode}')">📦 Label</button>
-
-    <button class="btn-del" onclick="hapus('${p.barcode}')">Hapus</button>
+    <button class="btn" onclick="tambahCart('${p.barcode}')">+ Keranjang</button>
 
     <svg id="bcode"></svg>
   </div>
  `;
 
- setTimeout(()=>{
-   JsBarcode("#bcode", p.barcode);
- },100);
+ setTimeout(()=>JsBarcode("#bcode", p.barcode),100);
 }
 
-// JUAL
-function jual(code){
+// TAMBAH KE KERANJANG
+function tambahCart(code){
  let qty = parseInt(document.getElementById("qty").value);
  let p = db.find(x=>x.barcode===code);
 
@@ -157,7 +153,54 @@ function jual(code){
   return;
  }
 
- let total = p.harga * qty;
+ let item = cart.find(x=>x.barcode===code);
+
+ if(item){
+  item.qty += qty;
+ } else {
+  cart.push({...p, qty});
+ }
+
+ renderCart();
+}
+
+// RENDER KERANJANG
+function renderCart(){
+ let html="";
+ let total = 0;
+
+ cart.forEach((c,i)=>{
+  let sub = c.harga * c.qty;
+  total += sub;
+
+  html+=`
+  <div class="card">
+   ${c.nama}<br>
+   ${c.qty} x ${rupiah(c.harga)} = ${rupiah(sub)}<br>
+   <button class="btn-del" onclick="hapusCart(${i})">Hapus</button>
+  </div>
+  `;
+ });
+
+ document.getElementById("cart").innerHTML = html || "Kosong";
+ document.getElementById("total").innerHTML = "Total: " + rupiah(total);
+}
+
+// HAPUS ITEM
+function hapusCart(i){
+ cart.splice(i,1);
+ renderCart();
+}
+
+// CHECKOUT
+function checkout(){
+ if(cart.length===0){
+  alert("Keranjang kosong!");
+  return;
+ }
+
+ let total = cart.reduce((a,c)=>a + c.harga*c.qty,0);
+
  let bayar = parseInt(prompt("Total: " + rupiah(total) + "\nUang bayar:"));
 
  if(isNaN(bayar) || bayar < total){
@@ -166,52 +209,45 @@ function jual(code){
  }
 
  let kembali = bayar - total;
- p.stok -= qty;
+
+ // update stok
+ cart.forEach(c=>{
+  let p = db.find(x=>x.barcode===c.barcode);
+  p.stok -= c.qty;
+ });
 
  history.push({
   tipe:"JUAL",
-  nama:p.nama,
-  qty,
+  items:cart,
   total,
   bayar,
   kembali,
   waktu:new Date().toLocaleString()
  });
 
+ cart = [];
  save();
 
  alert("Kembali: " + rupiah(kembali));
 
+ renderCart();
  renderProduk();
  renderHistory();
- tampilProduk(code);
 }
 
-// HAPUS
-function hapus(code){
- if(!confirm("Hapus produk?")) return;
-
- db = db.filter(x=>x.barcode!==code);
- save();
-
- document.getElementById("hasil").innerHTML="";
- renderProduk();
-}
-
-// LIST
+// LIST PRODUK
 function renderProduk(){
  let html="";
  db.forEach(p=>{
   html+=`
    <div class="card">
     <b>${p.nama}</b><br>
-    🏷 ${p.barcode}<br>
     💰 ${rupiah(p.harga)}<br>
-    📦 ${p.stok} ${p.satuan}
+    📦 ${p.stok}
    </div>
   `;
  });
- document.getElementById("listProduk").innerHTML=html || "Belum ada produk";
+ document.getElementById("listProduk").innerHTML = html || "Belum ada produk";
 }
 
 // RIWAYAT
@@ -219,14 +255,13 @@ function renderHistory(){
  let html="";
  history.slice().reverse().forEach(h=>{
   html+=`
-   <div class="card">
-    ${h.tipe} - ${h.nama}<br>
-    Qty: ${h.qty}<br>
-    Total: ${rupiah(h.total)}<br>
-    Bayar: ${rupiah(h.bayar)}<br>
-    Kembali: ${rupiah(h.kembali)}<br>
-    ${h.waktu}
-   </div>
+  <div class="card">
+   🧾 Transaksi<br>
+   Total: ${rupiah(h.total)}<br>
+   Bayar: ${rupiah(h.bayar)}<br>
+   Kembali: ${rupiah(h.kembali)}<br>
+   ${h.waktu}
+  </div>
   `;
  });
  document.getElementById("riwayat").innerHTML=html;
@@ -246,71 +281,11 @@ function startScanner(){
  );
 }
 
-// PRINT STRUK
-function printStruk(code){
- let p = db.find(x=>x.barcode===code);
-
- let win = window.open("", "", "width=300,height=600");
-
- win.document.write(`
-  <body onload="window.print();window.close();" style="font-family:monospace;font-size:12px;">
-  <center><b>TOKO ANDA</b></center>
-  <hr>
-  ${p.nama}<br>
-  ${p.barcode}<br>
-  Harga: ${rupiah(p.harga)}<br>
-  Stok: ${p.stok}<br>
-  <hr>
-  ${new Date().toLocaleString()}
-  <hr>
-  Terima Kasih
-  </body>
- `);
-
- win.document.close();
-}
-
-// PRINT BARCODE
-function printBarcode(code){
- let temp = document.createElement("svg");
- JsBarcode(temp, code);
-
- let win = window.open("", "", "width=300,height=400");
-
- win.document.write(`
-  <body onload="window.print();window.close();" style="text-align:center;">
-  ${temp.outerHTML}
-  <div>${code}</div>
-  </body>
- `);
-
- win.document.close();
-}
-
-// PRINT LABEL
-function printLabel(code){
- let p = db.find(x=>x.barcode===code);
-
- let temp = document.createElement("svg");
- JsBarcode(temp, p.barcode, {height:40, displayValue:false});
-
- let win = window.open("", "", "width=300,height=200");
-
- win.document.write(`
-  <body onload="window.print();window.close();" style="text-align:center;">
-  <b>${p.nama}</b><br>
-  ${temp.outerHTML}
-  <div>${p.barcode}</div>
-  </body>
- `);
-
- win.document.close();
-}
-
 // LOAD
 window.onload = function(){
  renderProduk();
  renderHistory();
+ renderCart();
 }
 
 </script>
