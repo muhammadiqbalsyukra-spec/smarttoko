@@ -23,7 +23,7 @@ button {padding:8px; border:none; border-radius:6px; margin-top:5px;}
 
 <body>
 
-<header><h2>Stok Toko Pro</h2></header>
+<header><h2>Stok Toko </h2></header>
 
 <div class="container">
 
@@ -43,7 +43,7 @@ button {padding:8px; border:none; border-radius:6px; margin-top:5px;}
 <button onclick="startScanner()">📷 Scan Barcode</button>
 <div id="reader"></div>
 
-<input id="search" placeholder="Scan / ketik barcode lalu ENTER" onkeyup="cariProduk(event)">
+<input id="search" placeholder="Scan / ketik barcode / nama..." onkeyup="cariProduk(event)">
 
 <div id="hasil"></div>
 
@@ -107,14 +107,70 @@ function tambahProduk(){
  document.getElementById("harga").value="";
 }
 
-// CARI
-function cariProduk(e){
- if(e.key==="Enter"){
-  tampilProduk(document.getElementById("search").value);
+// 🔥 AUTO TAMBAH KE KERANJANG (INTI FITUR)
+function tambahCartLangsung(code){
+ let p = db.find(x=>x.barcode===code);
+
+ if(!p){
+  alert("Produk tidak ditemukan!");
+  return;
  }
+
+ if(p.stok <= 0){
+  alert("Stok habis!");
+  return;
+ }
+
+ let item = cart.find(x=>x.barcode===code);
+
+ if(item){
+  item.qty += 1;
+ } else {
+  cart.push({...p, qty:1});
+ }
+
+ renderCart();
 }
 
-// TAMPIL PRODUK
+// 🔍 SEARCH (BARCODE + NAMA)
+function cariProduk(e){
+ let keyword = document.getElementById("search").value.toLowerCase();
+
+ if(keyword === ""){
+  renderProduk();
+  document.getElementById("hasil").innerHTML="";
+  return;
+ }
+
+ // 🔥 ENTER = AUTO KASIR
+ if(e.key === "Enter"){
+  tambahCartLangsung(keyword);
+  document.getElementById("search").value="";
+  return;
+ }
+
+ // cari nama
+ let hasil = db.filter(p => 
+   p.nama.toLowerCase().includes(keyword)
+ );
+
+ let html = "";
+
+ hasil.forEach(p=>{
+  html += `
+  <div class="card">
+    <b>${p.nama}</b><br>
+    💰 ${rupiah(p.harga)}<br>
+    📦 ${p.stok}<br>
+    <button class="btn" onclick="tambahCartLangsung('${p.barcode}')">+ Cepat</button>
+  </div>
+  `;
+ });
+
+ document.getElementById("hasil").innerHTML = html || "Tidak ditemukan";
+}
+
+// TAMPIL PRODUK (MODE MANUAL)
 function tampilProduk(code){
  let p = db.find(x=>x.barcode===code);
 
@@ -131,7 +187,7 @@ function tampilProduk(code){
 
     <input id="qty-${p.barcode}" type="number" value="1" min="1">
 
-    <button class="btn" onclick="tambahCart('${p.barcode}')">+ Keranjang</button>
+    <button class="btn" onclick="tambahCartManual('${p.barcode}')">+ Keranjang</button>
 
     <svg id="bcode"></svg>
   </div>
@@ -140,15 +196,9 @@ function tampilProduk(code){
  setTimeout(()=>JsBarcode("#bcode", p.barcode),100);
 }
 
-// TAMBAH KE KERANJANG
-function tambahCart(code){
+// TAMBAH MANUAL
+function tambahCartManual(code){
  let input = document.getElementById("qty-"+code);
-
- if(!input){
-  alert("Input jumlah tidak ditemukan!");
-  return;
- }
-
  let qty = parseInt(input.value);
 
  if(isNaN(qty) || qty <= 0){
@@ -157,11 +207,6 @@ function tambahCart(code){
  }
 
  let p = db.find(x=>x.barcode===code);
-
- if(!p){
-  alert("Produk tidak ditemukan!");
-  return;
- }
 
  if(p.stok < qty){
   alert("Stok tidak cukup!");
@@ -316,14 +361,13 @@ function renderHistory(){
  document.getElementById("riwayat").innerHTML=html;
 }
 
-// SCANNER
+// SCANNER (AUTO MASUK)
 function startScanner(){
  const scanner = new Html5Qrcode("reader");
 
  scanner.start({facingMode:"environment"},{fps:10,qrbox:250},
   (text)=>{
-    document.getElementById("search").value=text;
-    tampilProduk(text);
+    tambahCartLangsung(text);
     scanner.stop();
     document.getElementById("reader").innerHTML="";
   }
