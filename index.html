@@ -16,7 +16,6 @@ input, select {width:100%; padding:10px; margin-bottom:8px;}
 .card {background:white; padding:10px; border-radius:10px; margin-bottom:10px;}
 button {padding:8px; border:none; border-radius:6px; margin-top:5px;}
 .btn {background:green; color:white;}
-.btn-out {background:red; color:white;}
 .btn-del {background:#333; color:white;}
 .total {font-size:18px; font-weight:bold;}
 </style>
@@ -28,7 +27,6 @@ button {padding:8px; border:none; border-radius:6px; margin-top:5px;}
 
 <div class="container">
 
-<!-- INPUT PRODUK -->
 <div class="card">
 <h3>Tambah Produk</h3>
 <input id="nama" placeholder="Nama barang">
@@ -49,7 +47,6 @@ button {padding:8px; border:none; border-radius:6px; margin-top:5px;}
 
 <div id="hasil"></div>
 
-<!-- KERANJANG -->
 <h3>🛒 Keranjang</h3>
 <div id="cart"></div>
 <div class="total" id="total"></div>
@@ -192,6 +189,66 @@ function hapusCart(i){
  renderCart();
 }
 
+// PRINT STRUK
+function printStrukKasir(data){
+
+ let itemsHTML = "";
+ data.items.forEach(i=>{
+   itemsHTML += `
+   <tr>
+     <td>${i.nama}</td>
+     <td>${i.qty} x ${rupiah(i.harga)}</td>
+     <td align="right">${rupiah(i.qty*i.harga)}</td>
+   </tr>
+   `;
+ });
+
+ let win = window.open("", "", "width=300,height=600");
+
+ win.document.write(`
+ <html>
+ <head>
+ <style>
+ body{font-family: monospace; width:220px; font-size:12px;}
+ .center{text-align:center;}
+ table{width:100%;}
+ td{padding:2px 0;}
+ .line{border-top:1px dashed #000; margin:5px 0;}
+ </style>
+ </head>
+
+ <body onload="window.print();window.close();">
+
+ <div class="center"><b>TOKO ANDA</b></div>
+ <div class="center">Kasir Digital</div>
+
+ <div class="line"></div>
+
+ <table>
+ ${itemsHTML}
+ </table>
+
+ <div class="line"></div>
+
+ Total : ${rupiah(data.total)}<br>
+ Bayar : ${rupiah(data.bayar)}<br>
+ Kembali : ${rupiah(data.kembali)}<br>
+
+ <div class="line"></div>
+
+ ${data.waktu}
+
+ <div class="line"></div>
+
+ <div class="center">Terima Kasih</div>
+
+ </body>
+ </html>
+ `);
+
+ win.document.close();
+}
+
 // CHECKOUT
 function checkout(){
  if(cart.length===0){
@@ -210,25 +267,28 @@ function checkout(){
 
  let kembali = bayar - total;
 
- // update stok
  cart.forEach(c=>{
   let p = db.find(x=>x.barcode===c.barcode);
   p.stok -= c.qty;
  });
 
- history.push({
+ let trx = {
   tipe:"JUAL",
-  items:cart,
+  items:[...cart],
   total,
   bayar,
   kembali,
   waktu:new Date().toLocaleString()
- });
+ };
+
+ history.push(trx);
 
  cart = [];
  save();
 
  alert("Kembali: " + rupiah(kembali));
+
+ printStrukKasir(trx);
 
  renderCart();
  renderProduk();
