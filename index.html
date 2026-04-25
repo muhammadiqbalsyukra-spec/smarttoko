@@ -3,38 +3,130 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stok Toko Pro</title>
+<title>Kasir Pro Cloud</title>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
 <script src="https://unpkg.com/html5-qrcode"></script>
 
 <style>
-body {font-family: Arial; background:#f4f6f9; margin:0;}
-header {background:#28a745; color:white; padding:15px; text-align:center;}
-.container {padding:10px; max-width:600px; margin:auto;}
-input, select {width:100%; padding:10px; margin-bottom:8px; border-radius:6px; border:1px solid #ccc;}
-.card {background:white; padding:12px; border-radius:12px; margin-bottom:10px; box-shadow:0 2px 6px rgba(0,0,0,0.1);}
-button {padding:10px; border:none; border-radius:8px; margin-top:5px;}
-.btn {background:#28a745; color:white;}
-.btn-del {background:red; color:white;}
-.total {font-size:18px; font-weight:bold;}
-hr {border:0; border-top:1px dashed #000;}
-.small {font-size:12px; color:#666;}
+:root{
+  --primary:#28a745;
+  --bg:#f5f6fa;
+}
+
+body{
+  margin:0;
+  font-family:'Segoe UI',sans-serif;
+  background:var(--bg);
+}
+
+header{
+  background:var(--primary);
+  color:white;
+  padding:15px;
+  text-align:center;
+  font-weight:bold;
+}
+
+.container{
+  padding:12px;
+  padding-bottom:90px;
+  max-width:600px;
+  margin:auto;
+}
+
+.card{
+  background:white;
+  border-radius:16px;
+  padding:12px;
+  margin-bottom:12px;
+  box-shadow:0 4px 10px rgba(0,0,0,0.08);
+}
+
+input{
+  width:100%;
+  padding:12px;
+  margin-bottom:8px;
+  border-radius:10px;
+  border:1px solid #ddd;
+}
+
+button{
+  width:100%;
+  padding:12px;
+  border:none;
+  border-radius:12px;
+  margin-top:6px;
+  font-weight:bold;
+}
+
+.btn{background:var(--primary); color:white;}
+.btn-del{background:#e74c3c; color:white;}
+
+.navbar{
+  position:fixed;
+  bottom:0;
+  left:0;
+  right:0;
+  display:flex;
+  justify-content:space-around;
+  background:white;
+  padding:10px;
+  box-shadow:0 -3px 10px rgba(0,0,0,0.1);
+}
+
+.nav-item{
+  text-align:center;
+  font-size:12px;
+  color:#999;
+}
+
+.nav-item.active{
+  color:var(--primary);
+  font-weight:bold;
+}
+
+.page{display:none; animation:fade .3s;}
+.page.active{display:block;}
+
+@keyframes fade{
+  from{opacity:0; transform:translateY(10px);}
+  to{opacity:1; transform:translateY(0);}
+}
 </style>
 </head>
 
 <body>
 
-<header><h2 id="judul">🛒 Stok Toko Pro</h2></header>
+<header>🛒 Kasir Pro Cloud</header>
 
 <div class="container">
 
+<!-- LOGIN -->
+<div id="pageLogin" class="card">
+<h3>Login / Daftar</h3>
+<input id="email" placeholder="Email">
+<input id="password" type="password" placeholder="Password">
+<button class="btn" onclick="login()">Login</button>
+<button class="btn" onclick="register()">Daftar</button>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none;">
+
+<!-- KASIR -->
+<div id="pageKasir" class="page active">
+
 <div class="card">
-<h3 id="txt_tambah">Tambah Produk</h3>
 <input id="nama" placeholder="Nama barang">
-<input id="barcodeInput" placeholder="Barcode (auto)">
+<input id="barcodeInput" placeholder="Barcode">
 <input id="stok" type="number" placeholder="Stok">
-<input id="harga_pcs" type="number" placeholder="Harga">
-<button class="btn" onclick="tambahProduk()" id="btn_simpan">Simpan</button>
+<input id="harga" type="number" placeholder="Harga">
+<button class="btn" onclick="tambahProduk()">Simpan Produk</button>
 </div>
 
 <button class="btn" onclick="startScanner()">📷 Scan</button>
@@ -43,394 +135,201 @@ hr {border:0; border-top:1px dashed #000;}
 
 <input id="search" placeholder="Scan / ketik..." onkeyup="cariProduk(event)">
 
-<h3 id="txt_cart">🛒 Keranjang</h3>
-<div id="cart"></div>
-<div id="total" class="total"></div>
-<button class="btn" onclick="checkout()" id="btn_checkout">Checkout</button>
-
-<h3>🧾 Struk</h3>
-<div id="struk" class="card" style="display:none;"></div>
-<button class="btn" onclick="printStruk()">🖨 Print</button>
-
-<h3>📊 Laporan</h3>
-<div id="laporan" class="card"></div>
-
-<h3>📚 Riwayat</h3>
-<div id="riwayat"></div>
-
-<h3>⚙️ Pengaturan</h3>
-<div class="card">
-
-<label>Password</label>
-<input type="password" id="set_pass">
-<button class="btn" onclick="simpanPassword()">Simpan Password</button>
-
-<hr>
-
-<label>Bahasa</label>
-<select id="set_bahasa" onchange="gantiBahasa()">
-  <option value="id">Indonesia</option>
-  <option value="en">English</option>
-</select>
-
-<hr>
-
-<label>Nama Toko</label>
-<input id="set_toko">
-<button class="btn" onclick="simpanToko()">Simpan</button>
-
-<hr>
-
-<h4>Backup & Data</h4>
-<button class="btn" onclick="backupData()">💾 Backup Data</button>
-<input type="file" id="restoreFile" onchange="restoreData(event)">
-<button class="btn" onclick="exportExcel()">📊 Export Excel</button>
-
-<hr>
-
-<button class="btn-del" onclick="resetData()">Reset Semua Data</button>
+<div id="cart" class="card"></div>
+<div id="total"></div>
+<button class="btn" onclick="checkout()">Checkout</button>
 
 </div>
 
+<!-- LAPORAN -->
+<div id="pageLaporan" class="page">
+<div id="laporan" class="card"></div>
+<div id="riwayat"></div>
+</div>
+
+<!-- SETTING -->
+<div id="pageSetting" class="page">
+<div class="card">
+<input id="set_toko" placeholder="Nama toko">
+<button class="btn" onclick="simpanToko()">Simpan</button>
+<button class="btn-del" onclick="logout()">Logout</button>
+</div>
+</div>
+
+</div>
+</div>
+
+<!-- NAV -->
+<div class="navbar">
+<div class="nav-item active" onclick="showPage('Kasir',this)">🏠<br>Kasir</div>
+<div class="nav-item" onclick="showPage('Laporan',this)">📊<br>Laporan</div>
+<div class="nav-item" onclick="showPage('Setting',this)">⚙️<br>Setting</div>
 </div>
 
 <script>
 
-// ===== DATA =====
-let db = JSON.parse(localStorage.getItem("db")) || [];
-let cart = [];
-let riwayat = JSON.parse(localStorage.getItem("riwayat")) || [];
-let scanner = null;
-
-// ===== PASSWORD =====
-function cekPassword(){
- let pass = localStorage.getItem("app_pass");
- if(pass){
-  let input = prompt("Masukkan password:");
-  if(input !== pass){
-    alert("Salah!");
-    location.reload();
-  }
- }
-}
-cekPassword();
-
-function simpanPassword(){
- let pass = document.getElementById("set_pass").value;
- localStorage.setItem("app_pass", pass);
- alert("Password tersimpan!");
-}
-
-// ===== BAHASA (BASIC) =====
-const kamus = {
- id: { tambah:"Tambah Produk", cart:"Keranjang", checkout:"Checkout", simpan:"Simpan" },
- en: { tambah:"Add Product", cart:"Cart", checkout:"Checkout", simpan:"Save" }
+  const firebaseConfig = {
+  apiKey: "AIzaSyBYkPd9KaoJoSEAhO2BsVz8P76GnNJuVnY",
+  authDomain: "smarttoko-cfa75.firebaseapp.com",
+  projectId: "smarttoko-cfa75",
+  storageBucket: "smarttoko-cfa75.firebasestorage.app",
+  messagingSenderId: "408497647205",
+  appId: "1:408497647205:web:cedd0b3ec9775c4897e08c",
+  measurementId: "G-PV0T28BK91"
 };
 
-function applyBahasa(){
- let b = localStorage.getItem("bahasa") || "id";
- document.getElementById("txt_tambah").innerText = kamus[b].tambah;
- document.getElementById("txt_cart").innerText = "🛒 " + kamus[b].cart;
- document.getElementById("btn_checkout").innerText = kamus[b].checkout;
- document.getElementById("btn_simpan").innerText = kamus[b].simpan;
- document.getElementById("set_bahasa").value = b;
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+let user=null;
+let produk=[], cart=[], riwayat=[];
+
+// AUTH
+function register(){
+ auth.createUserWithEmailAndPassword(email.value,password.value)
+  .then(()=>alert("Berhasil daftar"));
 }
 
-function gantiBahasa(){
- let b = document.getElementById("set_bahasa").value;
- localStorage.setItem("bahasa", b);
- applyBahasa();
+function login(){
+ auth.signInWithEmailAndPassword(email.value,password.value);
 }
 
-// ===== NAMA TOKO =====
-function simpanToko(){
- let nama = document.getElementById("set_toko").value;
- localStorage.setItem("nama_toko", nama);
- alert("Disimpan!");
+function logout(){
+ auth.signOut();
 }
 
-// ===== UTIL =====
-function beep(){
- let audio = new Audio("https://www.soundjay.com/button/sounds/beep-07.mp3");
- audio.play();
+auth.onAuthStateChanged(u=>{
+ if(u){
+  user=u;
+  pageLogin.style.display="none";
+  app.style.display="block";
+  loadData();
+ }else{
+  pageLogin.style.display="block";
+  app.style.display="none";
+ }
+});
+
+// NAV
+function showPage(p,el){
+ document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
+ document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
+
+ document.getElementById("page"+p).classList.add("active");
+ el.classList.add("active");
 }
 
-function rupiah(a){
- return "Rp " + (a||0).toLocaleString("id-ID");
+// UTIL
+function rupiah(n){return "Rp "+(n||0).toLocaleString("id-ID");}
+
+// FIRESTORE
+function loadData(){
+ db.collection("users").doc(user.uid).collection("produk")
+ .onSnapshot(snap=>{
+  produk=[];
+  snap.forEach(doc=>produk.push({...doc.data(),id:doc.id}));
+ });
+
+ db.collection("users").doc(user.uid).collection("transaksi")
+ .onSnapshot(snap=>{
+  riwayat=[];
+  snap.forEach(doc=>riwayat.push(doc.data()));
+  renderLaporan();
+ });
 }
 
-function save(){
- localStorage.setItem("db", JSON.stringify(db));
- localStorage.setItem("riwayat", JSON.stringify(riwayat));
-}
-
-// ===== PRODUK =====
+// PRODUK
 function tambahProduk(){
- let nama = namaEl.value.trim();
- let barcode = barcodeInput.value.trim() || Date.now().toString();
- let stok = parseInt(stokEl.value);
- let harga = parseInt(harga_pcsEl.value);
-
- if(!nama || isNaN(stok) || isNaN(harga)){
-  alert("Isi lengkap!");
-  return;
- }
-
- db.push({nama, barcode, stok, harga_pcs:harga});
- save();
-
- namaEl.value="";
- barcodeInput.value="";
- stokEl.value="";
- harga_pcsEl.value="";
+ db.collection("users").doc(user.uid).collection("produk").add({
+  nama:nama.value,
+  barcode:barcodeInput.value||Date.now(),
+  stok:parseInt(stok.value),
+  harga:parseInt(harga.value)
+ });
 }
 
-// ===== SCANNER =====
-function startScanner(){
- if(scanner) return;
+// CART
+function tambahCart(code){
+ let p=produk.find(x=>x.barcode==code);
+ if(!p || p.stok<=0) return alert("Stok habis");
 
- scanner = new Html5Qrcode("reader");
- scanner.start(
-  { facingMode:"environment" },
-  { fps:10, qrbox:250 },
-  (text)=>{
-    beep();
-    let p = db.find(x=>x.barcode===text);
-    if(p){
-      tambahCartCepat(text);
-    } else {
-      barcodeInput.value = text;
-      namaEl.focus();
-      alert("Produk belum ada!");
-    }
-  }
- );
-}
-
-function stopScanner(){
- if(scanner){
-  scanner.stop().then(()=>{
-    scanner=null;
-    reader.innerHTML="";
-  });
- }
-}
-
-// ===== CART =====
-function tambahCartCepat(code){
- let p = db.find(x=>x.barcode===code);
- if(!p) return;
-
- if(p.stok <= 0){
-  alert("Stok habis!");
-  return;
- }
-
- let item = cart.find(x=>x.barcode===code);
- if(item){
-  item.qty++;
- } else {
-  cart.push({...p, qty:1});
- }
+ let item=cart.find(x=>x.barcode==code);
+ if(item) item.qty++; else cart.push({...p,qty:1});
 
  renderCart();
 }
 
 function renderCart(){
- let html="";
- let total=0;
-
- cart.forEach((c,i)=>{
-  let sub = c.qty*c.harga_pcs;
-  total+=sub;
-
-  html+=`
-  <div class="card">
-    ${c.nama} <span class="small">(Stok: ${c.stok})</span><br>
-    ${c.qty} x ${rupiah(c.harga_pcs)}<br>
-    ${rupiah(sub)}<br>
-    <button class="btn-del" onclick="hapus(${i})">Hapus</button>
-  </div>`;
- });
-
- cartEl.innerHTML = html || "Kosong";
- totalEl.innerHTML = "Total: "+rupiah(total);
-}
-
-function hapus(i){
- cart.splice(i,1);
- renderCart();
-}
-
-// ===== CHECKOUT =====
-function checkout(){
- if(cart.length===0) return alert("Kosong!");
-
- let total=0;
- let trx = "TRX"+Date.now();
- let tanggal = new Date().toLocaleString("id-ID");
+ let html="",total=0;
 
  cart.forEach(c=>{
-  total += c.qty*c.harga_pcs;
-  let p = db.find(x=>x.barcode===c.barcode);
-  if(p) p.stok -= c.qty;
+  let sub=c.qty*c.harga;
+  total+=sub;
+
+  html+=`${c.nama}<br>${c.qty} x ${rupiah(c.harga)} = ${rupiah(sub)}<hr>`;
  });
 
- riwayat.unshift({trx,tanggal,total,items:[...cart]});
- save();
+ document.getElementById("cart").innerHTML=html||"Kosong";
+ document.getElementById("total").innerHTML="Total: "+rupiah(total);
+}
 
- tampilStruk(trx,tanggal,cart,total);
+// CHECKOUT
+function checkout(){
+ let total=0;
+
+ cart.forEach(c=>{
+  total+=c.qty*c.harga;
+
+  let ref=db.collection("users").doc(user.uid)
+  .collection("produk").doc(c.id);
+
+  ref.update({stok:c.stok-c.qty});
+ });
+
+ db.collection("users").doc(user.uid).collection("transaksi")
+ .add({total:total,tgl:new Date().toLocaleString()});
 
  cart=[];
- renderCart();
- renderRiwayat();
- renderLaporan();
 }
 
-// ===== STRUK =====
-function tampilStruk(trx,tanggal,items,total){
- let toko = localStorage.getItem("nama_toko") || "STOK TOKO PRO";
-
- let html=`
-  <center>
-  <b>${toko}</b><br>
-  ${tanggal}<br>
-  No: ${trx}
-  </center><hr>
- `;
-
- items.forEach((i,idx)=>{
-  let sub = i.qty*i.harga_pcs;
-  html+=`
-  ${idx+1}. ${i.nama}<br>
-  ${i.qty} x ${rupiah(i.harga_pcs)}<br>
-  ${rupiah(sub)}<hr>
-  `;
- });
-
- html+=`<b>Total: ${rupiah(total)}</b><hr>
- <center>Terima kasih 🙏</center>`;
-
- struk.style.display="block";
- struk.innerHTML=html;
-}
-
-function printStruk(){
- let isi = struk.innerHTML;
- let win = window.open('', '', 'width=300,height=600');
- win.document.write(`<body onload="window.print()">${isi}</body>`);
- win.document.close();
-
- setTimeout(()=>{
-  struk.style.display="none";
-  struk.innerHTML="";
- },1000);
-}
-
-// ===== RIWAYAT =====
-function renderRiwayat(){
- let html="";
- riwayat.slice(0,5).forEach(r=>{
-  html+=`
-  <div class="card">
-    ${r.trx}<br>
-    ${r.tanggal}<br>
-    ${rupiah(r.total)}
-  </div>`;
- });
- riwayatEl.innerHTML = html;
-}
-
-// ===== LAPORAN =====
+// LAPORAN
 function renderLaporan(){
- let total = riwayat.reduce((a,b)=>a+b.total,0);
- laporan.innerHTML = `
-  Total Transaksi: ${riwayat.length}<br>
-  Omset: ${rupiah(total)}
- `;
+ let total=riwayat.reduce((a,b)=>a+b.total,0);
+
+ document.getElementById("laporan").innerHTML=
+ `Transaksi: ${riwayat.length}<br>Omset: ${rupiah(total)}`;
+
+ document.getElementById("riwayat").innerHTML=
+ riwayat.slice(0,5).map(r=>`${rupiah(r.total)}<hr>`).join("");
 }
 
-// ===== BACKUP =====
-function backupData(){
- let data = {db, riwayat};
- let blob = new Blob([JSON.stringify(data)], {type:"application/json"});
- let url = URL.createObjectURL(blob);
- let a = document.createElement("a");
- a.href = url;
- a.download = "backup_toko.json";
- a.click();
+// SCAN
+let scanner=null;
+
+function startScanner(){
+ if(scanner) return;
+
+ scanner=new Html5Qrcode("reader");
+ scanner.start({facingMode:"environment"},{fps:10},
+ text=>tambahCart(text));
 }
 
-// ===== RESTORE =====
-function restoreData(event){
- let file = event.target.files[0];
- if(!file) return;
-
- let readerFile = new FileReader();
- readerFile.onload = function(e){
-  let data = JSON.parse(e.target.result);
-  db = data.db || [];
-  riwayat = data.riwayat || [];
-
-  save();
-  renderCart();
-  renderRiwayat();
-  renderLaporan();
-
-  alert("Data berhasil direstore!");
- };
- readerFile.readAsText(file);
-}
-
-// ===== EXPORT CSV =====
-function exportExcel(){
- let csv = "No,Tanggal,Total\n";
- riwayat.forEach((r,i)=>{
-  csv += `${i+1},${r.tanggal},${r.total}\n`;
- });
-
- let blob = new Blob([csv], {type:"text/csv"});
- let url = URL.createObjectURL(blob);
- let a = document.createElement("a");
- a.href = url;
- a.download = "laporan.csv";
- a.click();
-}
-
-// ===== RESET =====
-function resetData(){
- if(confirm("Hapus semua data?")){
-  localStorage.clear();
-  location.reload();
+function stopScanner(){
+ if(scanner){
+  scanner.stop();
+  scanner=null;
  }
 }
 
-// ===== SEARCH =====
+// SEARCH
 function cariProduk(e){
  if(e.key==="Enter"){
-  tambahCartCepat(search.value);
+  tambahCart(search.value);
   search.value="";
  }
 }
-
-// ===== INIT =====
-const namaEl = document.getElementById("nama");
-const barcodeInput = document.getElementById("barcodeInput");
-const stokEl = document.getElementById("stok");
-const harga_pcsEl = document.getElementById("harga_pcs");
-
-const cartEl = document.getElementById("cart");
-const totalEl = document.getElementById("total");
-const reader = document.getElementById("reader");
-const struk = document.getElementById("struk");
-const riwayatEl = document.getElementById("riwayat");
-const laporan = document.getElementById("laporan");
-const search = document.getElementById("search");
-
-applyBahasa();
-renderCart();
-renderRiwayat();
-renderLaporan();
 
 </script>
 
