@@ -129,7 +129,7 @@ function tampilProduk(code){
     💰 ${rupiah(p.harga)}<br>
     📦 ${p.stok}<br>
 
-    <input id="qty" type="number" placeholder="Jumlah">
+    <input id="qty-${p.barcode}" type="number" value="1" min="1">
 
     <button class="btn" onclick="tambahCart('${p.barcode}')">+ Keranjang</button>
 
@@ -142,10 +142,28 @@ function tampilProduk(code){
 
 // TAMBAH KE KERANJANG
 function tambahCart(code){
- let qty = parseInt(document.getElementById("qty").value);
+ let input = document.getElementById("qty-"+code);
+
+ if(!input){
+  alert("Input jumlah tidak ditemukan!");
+  return;
+ }
+
+ let qty = parseInt(input.value);
+
+ if(isNaN(qty) || qty <= 0){
+  alert("Masukkan jumlah!");
+  return;
+ }
+
  let p = db.find(x=>x.barcode===code);
 
- if(!qty || p.stok < qty){
+ if(!p){
+  alert("Produk tidak ditemukan!");
+  return;
+ }
+
+ if(p.stok < qty){
   alert("Stok tidak cukup!");
   return;
  }
@@ -158,6 +176,7 @@ function tambahCart(code){
   cart.push({...p, qty});
  }
 
+ input.value = 1;
  renderCart();
 }
 
@@ -183,7 +202,7 @@ function renderCart(){
  document.getElementById("total").innerHTML = "Total: " + rupiah(total);
 }
 
-// HAPUS ITEM
+// HAPUS
 function hapusCart(i){
  cart.splice(i,1);
  renderCart();
@@ -191,7 +210,6 @@ function hapusCart(i){
 
 // PRINT STRUK
 function printStrukKasir(data){
-
  let itemsHTML = "";
  data.items.forEach(i=>{
    itemsHTML += `
@@ -206,44 +224,19 @@ function printStrukKasir(data){
  let win = window.open("", "", "width=300,height=600");
 
  win.document.write(`
- <html>
- <head>
- <style>
- body{font-family: monospace; width:220px; font-size:12px;}
- .center{text-align:center;}
- table{width:100%;}
- td{padding:2px 0;}
- .line{border-top:1px dashed #000; margin:5px 0;}
- </style>
- </head>
-
- <body onload="window.print();window.close();">
-
- <div class="center"><b>TOKO ANDA</b></div>
- <div class="center">Kasir Digital</div>
-
- <div class="line"></div>
-
- <table>
- ${itemsHTML}
- </table>
-
- <div class="line"></div>
-
+ <body onload="window.print();window.close();" style="font-family:monospace;font-size:12px;width:220px;">
+ <center><b>TOKO ANDA</b></center>
+ <hr>
+ <table>${itemsHTML}</table>
+ <hr>
  Total : ${rupiah(data.total)}<br>
  Bayar : ${rupiah(data.bayar)}<br>
  Kembali : ${rupiah(data.kembali)}<br>
-
- <div class="line"></div>
-
+ <hr>
  ${data.waktu}
-
- <div class="line"></div>
-
- <div class="center">Terima Kasih</div>
-
+ <hr>
+ <center>Terima Kasih</center>
  </body>
- </html>
  `);
 
  win.document.close();
@@ -257,7 +250,6 @@ function checkout(){
  }
 
  let total = cart.reduce((a,c)=>a + c.harga*c.qty,0);
-
  let bayar = parseInt(prompt("Total: " + rupiah(total) + "\nUang bayar:"));
 
  if(isNaN(bayar) || bayar < total){
@@ -273,7 +265,6 @@ function checkout(){
  });
 
  let trx = {
-  tipe:"JUAL",
   items:[...cart],
   total,
   bayar,
@@ -282,8 +273,8 @@ function checkout(){
  };
 
  history.push(trx);
-
  cart = [];
+
  save();
 
  alert("Kembali: " + rupiah(kembali));
@@ -295,7 +286,7 @@ function checkout(){
  renderHistory();
 }
 
-// LIST PRODUK
+// LIST
 function renderProduk(){
  let html="";
  db.forEach(p=>{
@@ -318,8 +309,6 @@ function renderHistory(){
   <div class="card">
    🧾 Transaksi<br>
    Total: ${rupiah(h.total)}<br>
-   Bayar: ${rupiah(h.bayar)}<br>
-   Kembali: ${rupiah(h.kembali)}<br>
    ${h.waktu}
   </div>
   `;
