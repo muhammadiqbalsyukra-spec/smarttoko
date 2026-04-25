@@ -36,13 +36,14 @@ button {padding:8px; border:none; border-radius:6px; margin-top:5px;}
 <option>CRT</option>
 </select>
 <input type="number" id="stok" placeholder="Stok awal">
+<input type="number" id="harga" placeholder="Harga jual">
 <button class="btn" onclick="tambahProduk()">Simpan</button>
 </div>
 
 <button onclick="startScanner()">📷 Scan Barcode</button>
 <div id="reader"></div>
 
-<input id="search" placeholder="Cari barcode..." onkeyup="cariProduk(event)">
+<input id="search" placeholder="Scan / ketik barcode lalu ENTER" onkeyup="cariProduk(event)">
 
 <div id="hasil"></div>
 
@@ -59,11 +60,18 @@ button {padding:8px; border:none; border-radius:6px; margin-top:5px;}
 let db = JSON.parse(localStorage.getItem("db")) || [];
 let history = JSON.parse(localStorage.getItem("history")) || [];
 
+// SAVE
 function save(){
  localStorage.setItem("db", JSON.stringify(db));
  localStorage.setItem("history", JSON.stringify(history));
 }
 
+// FORMAT RUPIAH
+function rupiah(angka){
+ return "Rp " + angka.toLocaleString("id-ID");
+}
+
+// AUTO BARCODE
 function genBarcode(){
  return Date.now().toString();
 }
@@ -74,28 +82,27 @@ function tambahProduk(){
  let barcode = document.getElementById("barcodeInput").value.trim() || genBarcode();
  let satuan = document.getElementById("satuan").value;
  let stok = parseInt(document.getElementById("stok").value);
+ let harga = parseInt(document.getElementById("harga").value);
 
- if(!nama || isNaN(stok)){
+ if(!nama || isNaN(stok) || isNaN(harga)){
   alert("Lengkapi data!");
   return;
  }
 
- // CEK DUPLIKAT
  if(db.find(x=>x.barcode===barcode)){
   alert("Barcode sudah ada!");
   return;
  }
 
- db.push({nama, barcode, satuan, stok});
+ db.push({nama, barcode, satuan, stok, harga});
  save();
 
  document.getElementById("nama").value="";
  document.getElementById("barcodeInput").value="";
  document.getElementById("stok").value="";
+ document.getElementById("harga").value="";
 
  renderProduk();
- renderHistory();
-
  alert("Produk tersimpan ✅");
 }
 
@@ -118,12 +125,12 @@ function tampilProduk(code){
  document.getElementById("hasil").innerHTML=`
   <div class="card">
     <b>${p.nama}</b><br>
-    Stok: ${p.stok} ${p.satuan}<br>
+    💰 ${rupiah(p.harga)}<br>
+    📦 ${p.stok} ${p.satuan}<br>
 
-    <input id="qty" type="number" placeholder="Jumlah">
+    <input id="qty" type="number" placeholder="Jumlah beli">
 
-    <button class="btn" onclick="masuk('${p.barcode}')">Masuk</button>
-    <button class="btn-out" onclick="keluar('${p.barcode}')">Keluar</button>
+    <button class="btn" onclick="jual('${p.barcode}')">🛒 Jual</button>
 
     <button onclick="printStruk('${p.barcode}')">🧾 Struk</button>
     <button onclick="printBarcode('${p.barcode}')">🏷 Barcode</button>
@@ -140,57 +147,47 @@ function tampilProduk(code){
  },100);
 }
 
-// MASUK
-function masuk(code){
- let qty = parseInt(document.getElementById("qty").value);
- let p = db.find(x=>x.barcode===code);
-
- if(!qty){
-  alert("Isi jumlah");
-  return;
- }
-
- p.stok += qty;
-
- history.push({
-  tipe:"MASUK",
-  nama:p.nama,
-  qty,
-  waktu:new Date().toLocaleString()
- });
-
- save();
- tampilProduk(code);
- renderProduk();
- renderHistory();
-}
-
-// KELUAR
-function keluar(code){
+// JUAL
+function jual(code){
  let qty = parseInt(document.getElementById("qty").value);
  let p = db.find(x=>x.barcode===code);
 
  if(!qty || p.stok < qty){
-  alert("Stok tidak cukup");
+  alert("Stok tidak cukup!");
   return;
  }
 
+ let total = p.harga * qty;
+ let bayar = parseInt(prompt("Total: " + rupiah(total) + "\nUang bayar:"));
+
+ if(isNaN(bayar) || bayar < total){
+  alert("Uang kurang!");
+  return;
+ }
+
+ let kembali = bayar - total;
  p.stok -= qty;
 
  history.push({
-  tipe:"KELUAR",
+  tipe:"JUAL",
   nama:p.nama,
   qty,
+  total,
+  bayar,
+  kembali,
   waktu:new Date().toLocaleString()
  });
 
  save();
- tampilProduk(code);
+
+ alert("Kembali: " + rupiah(kembali));
+
  renderProduk();
  renderHistory();
+ tampilProduk(code);
 }
 
-// HAPUS PRODUK
+// HAPUS
 function hapus(code){
  if(!confirm("Hapus produk?")) return;
 
@@ -201,25 +198,20 @@ function hapus(code){
  renderProduk();
 }
 
-// LIST PRODUK
+// LIST
 function renderProduk(){
  let html="";
-
- if(db.length === 0){
-  html = "Belum ada produk";
- } else {
-  db.forEach(p=>{
-    html += `
-    <div class="card">
-      <b>${p.nama}</b><br>
-      🏷 ${p.barcode}<br>
-      📦 ${p.stok} ${p.satuan}
-    </div>
-    `;
-  });
- }
-
- document.getElementById("listProduk").innerHTML = html;
+ db.forEach(p=>{
+  html+=`
+   <div class="card">
+    <b>${p.nama}</b><br>
+    🏷 ${p.barcode}<br>
+    💰 ${rupiah(p.harga)}<br>
+    📦 ${p.stok} ${p.satuan}
+   </div>
+  `;
+ });
+ document.getElementById("listProduk").innerHTML=html || "Belum ada produk";
 }
 
 // RIWAYAT
@@ -229,7 +221,10 @@ function renderHistory(){
   html+=`
    <div class="card">
     ${h.tipe} - ${h.nama}<br>
-    ${h.qty}<br>
+    Qty: ${h.qty}<br>
+    Total: ${rupiah(h.total)}<br>
+    Bayar: ${rupiah(h.bayar)}<br>
+    Kembali: ${rupiah(h.kembali)}<br>
     ${h.waktu}
    </div>
   `;
@@ -263,6 +258,7 @@ function printStruk(code){
   <hr>
   ${p.nama}<br>
   ${p.barcode}<br>
+  Harga: ${rupiah(p.harga)}<br>
   Stok: ${p.stok}<br>
   <hr>
   ${new Date().toLocaleString()}
