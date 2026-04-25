@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stok Barang</title>
+<title>Stok Toko Pro</title>
 
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
@@ -17,6 +17,7 @@ input, select {width:100%; padding:10px; margin-bottom:8px;}
 button {padding:8px; border:none; border-radius:6px; margin-top:5px;}
 .btn {background:green; color:white;}
 .btn-out {background:red; color:white;}
+.btn-del {background:#333; color:white;}
 </style>
 </head>
 
@@ -38,7 +39,7 @@ button {padding:8px; border:none; border-radius:6px; margin-top:5px;}
 <button class="btn" onclick="tambahProduk()">Simpan</button>
 </div>
 
-<button onclick="startScanner()">Scan Barcode</button>
+<button onclick="startScanner()">📷 Scan Barcode</button>
 <div id="reader"></div>
 
 <input id="search" placeholder="Cari barcode..." onkeyup="cariProduk(event)">
@@ -58,26 +59,30 @@ button {padding:8px; border:none; border-radius:6px; margin-top:5px;}
 let db = JSON.parse(localStorage.getItem("db")) || [];
 let history = JSON.parse(localStorage.getItem("history")) || [];
 
-// SAVE
 function save(){
  localStorage.setItem("db", JSON.stringify(db));
  localStorage.setItem("history", JSON.stringify(history));
 }
 
-// AUTO BARCODE
 function genBarcode(){
  return Date.now().toString();
 }
 
 // TAMBAH PRODUK
 function tambahProduk(){
- let nama = document.getElementById("nama").value;
- let barcode = document.getElementById("barcodeInput").value || genBarcode();
+ let nama = document.getElementById("nama").value.trim();
+ let barcode = document.getElementById("barcodeInput").value.trim() || genBarcode();
  let satuan = document.getElementById("satuan").value;
  let stok = parseInt(document.getElementById("stok").value);
 
- if(!nama || !stok){
-  alert("Lengkapi data");
+ if(!nama || isNaN(stok)){
+  alert("Lengkapi data!");
+  return;
+ }
+
+ // CEK DUPLIKAT
+ if(db.find(x=>x.barcode===barcode)){
+  alert("Barcode sudah ada!");
   return;
  }
 
@@ -120,9 +125,11 @@ function tampilProduk(code){
     <button class="btn" onclick="masuk('${p.barcode}')">Masuk</button>
     <button class="btn-out" onclick="keluar('${p.barcode}')">Keluar</button>
 
-    <button onclick="printStruk('${p.barcode}')">Print Struk</button>
-    <button onclick="printBarcode('${p.barcode}')">Print Barcode</button>
-    <button onclick="printLabel('${p.barcode}')">Print Label</button>
+    <button onclick="printStruk('${p.barcode}')">🧾 Struk</button>
+    <button onclick="printBarcode('${p.barcode}')">🏷 Barcode</button>
+    <button onclick="printLabel('${p.barcode}')">📦 Label</button>
+
+    <button class="btn-del" onclick="hapus('${p.barcode}')">Hapus</button>
 
     <svg id="bcode"></svg>
   </div>
@@ -183,6 +190,17 @@ function keluar(code){
  renderHistory();
 }
 
+// HAPUS PRODUK
+function hapus(code){
+ if(!confirm("Hapus produk?")) return;
+
+ db = db.filter(x=>x.barcode!==code);
+ save();
+
+ document.getElementById("hasil").innerHTML="";
+ renderProduk();
+}
+
 // LIST PRODUK
 function renderProduk(){
  let html="";
@@ -233,127 +251,67 @@ function startScanner(){
  );
 }
 
-// PRINT STRUK 58MM
+// PRINT STRUK
 function printStruk(code){
  let p = db.find(x=>x.barcode===code);
 
  let win = window.open("", "", "width=300,height=600");
 
  win.document.write(`
-  <html>
-  <head>
-    <style>
-      body{
-        font-family: monospace;
-        width:220px;
-        margin:0;
-        padding:10px;
-        font-size:12px;
-      }
-      .center{text-align:center;}
-      .line{border-top:1px dashed #000; margin:5px 0;}
-      .bold{font-weight:bold;}
-    </style>
-  </head>
-
-  <body onload="window.print();window.close();">
-
-    <div class="center bold">TOKO ANDA</div>
-    <div class="center">Sorong</div>
-
-    <div class="line"></div>
-
-    Nama : ${p.nama}<br>
-    Barcode : ${p.barcode}<br>
-    Stok : ${p.stok} ${p.satuan}<br>
-
-    <div class="line"></div>
-
-    ${new Date().toLocaleString()}
-
-    <div class="line"></div>
-
-    <div class="center">Terima Kasih</div>
-
+  <body onload="window.print();window.close();" style="font-family:monospace;font-size:12px;">
+  <center><b>TOKO ANDA</b></center>
+  <hr>
+  ${p.nama}<br>
+  ${p.barcode}<br>
+  Stok: ${p.stok}<br>
+  <hr>
+  ${new Date().toLocaleString()}
+  <hr>
+  Terima Kasih
   </body>
-  </html>
  `);
 
  win.document.close();
 }
 
+// PRINT BARCODE
 function printBarcode(code){
  let temp = document.createElement("svg");
- JsBarcode(temp, code, {
-   format:"CODE128",
-   width:2,
-   height:60,
-   displayValue:true
- });
+ JsBarcode(temp, code);
 
  let win = window.open("", "", "width=300,height=400");
 
  win.document.write(`
-  <html>
-  <body style="text-align:center; margin-top:30px;">
-    ${temp.outerHTML}
-    <div>${code}</div>
-    <script>
-      window.onload = function(){
-        window.print();
-        window.close();
-      }
-    <\/script>
+  <body onload="window.print();window.close();" style="text-align:center;">
+  ${temp.outerHTML}
+  <div>${code}</div>
   </body>
-  </html>
- `);
-
- win.document.close();
-}
-    <\/script>
-
-  </body>
-  </html>
  `);
 
  win.document.close();
 }
 
+// PRINT LABEL
 function printLabel(code){
  let p = db.find(x=>x.barcode===code);
 
  let temp = document.createElement("svg");
-
- JsBarcode(temp, p.barcode, {
-   format:"CODE128",
-   width:2,
-   height:40,
-   displayValue:false
- });
+ JsBarcode(temp, p.barcode, {height:40, displayValue:false});
 
  let win = window.open("", "", "width=300,height=200");
 
  win.document.write(`
-  <html>
-  <body style="text-align:center; font-family:Arial;">
-    <b>${p.nama}</b><br>
-    ${temp.outerHTML}
-    <div>${p.barcode}</div>
-
-    <script>
-      window.onload = function(){
-        window.print();
-        window.close();
-      }
-    <\/script>
+  <body onload="window.print();window.close();" style="text-align:center;">
+  <b>${p.nama}</b><br>
+  ${temp.outerHTML}
+  <div>${p.barcode}</div>
   </body>
-  </html>
  `);
 
  win.document.close();
 }
 
-// LOAD AWAL
+// LOAD
 window.onload = function(){
  renderProduk();
  renderHistory();
