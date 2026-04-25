@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Stok Toko Pro</title>
 
+<script src="https://unpkg.com/html5-qrcode"></script>
+
 <style>
 body {font-family: Arial; background:#f5f5f5; margin:0;}
 header {background:#28a745; color:white; padding:15px; text-align:center;}
@@ -34,6 +36,9 @@ button {padding:8px; border:none; border-radius:6px; margin-top:5px;}
 <input id="isi" type="number" placeholder="Isi per CRT (contoh 12)">
 <button class="btn" onclick="tambahProduk()">Simpan</button>
 </div>
+
+<button onclick="startScanner()">📷 Scan Barcode</button>
+<div id="reader"></div>
 
 <input id="search" placeholder="Scan / ketik nama / barcode..." onkeyup="cariProduk(event)">
 
@@ -107,7 +112,7 @@ function tambahProduk(){
  alert("Produk tersimpan");
 }
 
-// AUTO TAMBAH (SCAN / ENTER)
+// 🔥 AUTO KASIR CEPAT
 function tambahCartCepat(code){
  let p = db.find(x=>x.barcode===code);
 
@@ -135,7 +140,7 @@ function cariProduk(e){
   return;
  }
 
- // ENTER = AUTO KASIR
+ // ENTER → AUTO KASIR
  if(e.key==="Enter"){
   tambahCartCepat(keyword);
   search.value="";
@@ -164,8 +169,6 @@ function cariProduk(e){
 // TAMBAH MANUAL
 function tambahCartManual(code,mode){
  let p = db.find(x=>x.barcode===code);
-
- if(!p) return;
 
  let qtyPCS = mode==="crt" ? p.isi : 1;
 
@@ -230,7 +233,22 @@ function checkout(){
  alert("Transaksi selesai");
 }
 
-// INIT ELEMENT
+// 🔥 SCANNER (AUTO MASUK)
+function startScanner(){
+ const scanner = new Html5Qrcode("reader");
+
+ scanner.start(
+  { facingMode: "environment" },
+  { fps: 10, qrbox: 250 },
+  (text)=>{
+    tambahCartCepat(text);
+    scanner.stop();
+    reader.innerHTML="";
+  }
+ );
+}
+
+// INIT
 const namaEl = document.getElementById("nama");
 const barcodeInput = document.getElementById("barcodeInput");
 const stokEl = document.getElementById("stok");
@@ -242,6 +260,7 @@ const search = document.getElementById("search");
 const hasil = document.getElementById("hasil");
 const cartEl = document.getElementById("cart");
 const totalEl = document.getElementById("total");
+const reader = document.getElementById("reader");
 
 renderCart();
 
