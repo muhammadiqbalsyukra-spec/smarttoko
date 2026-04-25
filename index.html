@@ -15,7 +15,7 @@ input {width:100%; padding:10px; margin-bottom:8px;}
 .card {background:white; padding:10px; border-radius:10px; margin-bottom:10px;}
 button {padding:8px; border:none; border-radius:6px; margin-top:5px;}
 .btn {background:green; color:white;}
-.btn-del {background:#333; color:white;}
+.btn-del {background:red; color:white;}
 .total {font-size:18px; font-weight:bold;}
 </style>
 </head>
@@ -33,15 +33,15 @@ button {padding:8px; border:none; border-radius:6px; margin-top:5px;}
 <input id="stok" type="number" placeholder="Stok awal (PCS)">
 <input id="harga_pcs" type="number" placeholder="Harga PCS">
 <input id="harga_crt" type="number" placeholder="Harga CRT">
-<input id="isi" type="number" placeholder="Isi per CRT (contoh 12)">
+<input id="isi" type="number" placeholder="Isi per CRT">
 <button class="btn" onclick="tambahProduk()">Simpan</button>
 </div>
 
-<button onclick="startScanner()">📷 Scan Barcode</button>
+<button class="btn" onclick="startScanner()">📷 Scan Barcode</button>
+<button class="btn-del" onclick="stopScanner()">❌ Tutup Kamera</button>
 <div id="reader"></div>
 
-<input id="search" placeholder="Scan / ketik nama / barcode..." onkeyup="cariProduk(event)">
-
+<input id="search" placeholder="Scan / ketik..." onkeyup="cariProduk(event)">
 <div id="hasil"></div>
 
 <h3>🛒 Keranjang</h3>
@@ -49,12 +49,17 @@ button {padding:8px; border:none; border-radius:6px; margin-top:5px;}
 <div id="total" class="total"></div>
 <button class="btn" onclick="checkout()">Checkout</button>
 
+<h3>🧾 Struk</h3>
+<div id="struk" class="card" style="display:none;"></div>
+<button class="btn" onclick="printStruk()">🖨 Print Struk</button>
+
 </div>
 
 <script>
 
 let db = JSON.parse(localStorage.getItem("db")) || [];
 let cart = [];
+let scanner = null;
 
 function save(){
  localStorage.setItem("db", JSON.stringify(db));
@@ -66,18 +71,6 @@ function rupiah(a){
 
 function genBarcode(){
  return Date.now().toString();
-}
-
-// 🔥 KONVERSI PCS → CRT
-function konversiPCS(qty, isi){
- let crt = Math.floor(qty / isi);
- let sisa = qty % isi;
-
- let text="";
- if(crt>0) text += crt+" CRT ";
- if(sisa>0) text += sisa+" PCS";
-
- return text || "0";
 }
 
 // TAMBAH PRODUK
@@ -94,11 +87,6 @@ function tambahProduk(){
   return;
  }
 
- if(db.find(x=>x.barcode===barcode)){
-  alert("Barcode sudah ada!");
-  return;
- }
-
  db.push({nama, barcode, stok, harga_pcs, harga_crt, isi});
  save();
 
@@ -108,20 +96,39 @@ function tambahProduk(){
  harga_pcsEl.value="";
  harga_crtEl.value="";
  isiEl.value="";
-
- alert("Produk tersimpan");
 }
 
-// 🔥 AUTO KASIR CEPAT
+// SCAN START
+function startScanner(){
+ if(scanner) return;
+
+ scanner = new Html5Qrcode("reader");
+
+ scanner.start(
+  { facingMode: "environment" },
+  { fps: 10, qrbox: 250 },
+  (text)=>{
+    tambahCartCepat(text);
+  }
+ );
+}
+
+// SCAN STOP
+function stopScanner(){
+ if(scanner){
+  scanner.stop().then(()=>{
+    scanner = null;
+    reader.innerHTML="";
+  });
+ }
+}
+
+// TAMBAH CEPAT
 function tambahCartCepat(code){
  let p = db.find(x=>x.barcode===code);
-
- if(!p) return alert("Barang tidak ditemukan");
-
- if(p.stok <= 0) return alert("Stok habis");
+ if(!p) return;
 
  let item = cart.find(x=>x.barcode===code);
-
  if(item){
   item.qty += 1;
  } else {
@@ -133,62 +140,13 @@ function tambahCartCepat(code){
 
 // SEARCH
 function cariProduk(e){
- let keyword = search.value.toLowerCase();
-
- if(keyword===""){
-  hasil.innerHTML="";
-  return;
- }
-
- // ENTER → AUTO KASIR
  if(e.key==="Enter"){
-  tambahCartCepat(keyword);
+  tambahCartCepat(search.value);
   search.value="";
-  return;
  }
-
- let hasilFilter = db.filter(p=>p.nama.toLowerCase().includes(keyword));
-
- let html="";
- hasilFilter.forEach(p=>{
-  html+=`
-  <div class="card">
-    <b>${p.nama}</b><br>
-    PCS: ${rupiah(p.harga_pcs)}<br>
-    CRT: ${rupiah(p.harga_crt)}<br>
-
-    <button class="btn" onclick="tambahCartManual('${p.barcode}','pcs')">+ PCS</button>
-    <button class="btn" onclick="tambahCartManual('${p.barcode}','crt')">+ CRT</button>
-  </div>
-  `;
- });
-
- hasil.innerHTML = html || "Tidak ditemukan";
 }
 
-// TAMBAH MANUAL
-function tambahCartManual(code,mode){
- let p = db.find(x=>x.barcode===code);
-
- let qtyPCS = mode==="crt" ? p.isi : 1;
-
- if(p.stok < qtyPCS){
-  alert("Stok tidak cukup");
-  return;
- }
-
- let item = cart.find(x=>x.barcode===code);
-
- if(item){
-  item.qty += qtyPCS;
- } else {
-  cart.push({...p, qty:qtyPCS});
- }
-
- renderCart();
-}
-
-// RENDER
+// RENDER CART
 function renderCart(){
  let html="";
  let total=0;
@@ -199,12 +157,11 @@ function renderCart(){
 
   html+=`
   <div class="card">
-    <b>${c.nama}</b><br>
-    ${konversiPCS(c.qty, c.isi)}<br>
-    = ${rupiah(sub)}<br>
+    ${c.nama}<br>
+    ${c.qty} PCS<br>
+    ${rupiah(sub)}<br>
     <button class="btn-del" onclick="hapus(${i})">Hapus</button>
-  </div>
-  `;
+  </div>`;
  });
 
  cartEl.innerHTML = html || "Kosong";
@@ -219,33 +176,34 @@ function hapus(i){
 
 // CHECKOUT
 function checkout(){
- if(cart.length===0) return alert("Keranjang kosong");
+ if(cart.length===0) return alert("Kosong");
 
- cart.forEach(c=>{
-  let p = db.find(x=>x.barcode===c.barcode);
-  p.stok -= c.qty;
- });
+ let total = cart.reduce((a,c)=>a + c.harga_pcs*c.qty,0);
+
+ tampilStruk({items:cart,total});
 
  cart=[];
  save();
  renderCart();
-
- alert("Transaksi selesai");
 }
 
-// 🔥 SCANNER (AUTO MASUK)
-function startScanner(){
- const scanner = new Html5Qrcode("reader");
+// STRUK
+function tampilStruk(data){
+ let html = `<b>STOK TOKO PRO</b><br>----------------<br>`;
 
- scanner.start(
-  { facingMode: "environment" },
-  { fps: 10, qrbox: 250 },
-  (text)=>{
-    tambahCartCepat(text);
-    scanner.stop();
-    reader.innerHTML="";
-  }
- );
+ data.items.forEach(i=>{
+  html+=`${i.nama}<br>${i.qty} PCS<br>${rupiah(i.harga_pcs*i.qty)}<br><br>`;
+ });
+
+ html+=`----------------<br>Total: ${rupiah(data.total)}`;
+
+ struk.style.display="block";
+ struk.innerHTML=html;
+}
+
+// PRINT
+function printStruk(){
+ window.print();
 }
 
 // INIT
@@ -257,10 +215,10 @@ const harga_crtEl = document.getElementById("harga_crt");
 const isiEl = document.getElementById("isi");
 
 const search = document.getElementById("search");
-const hasil = document.getElementById("hasil");
 const cartEl = document.getElementById("cart");
 const totalEl = document.getElementById("total");
 const reader = document.getElementById("reader");
+const struk = document.getElementById("struk");
 
 renderCart();
 
