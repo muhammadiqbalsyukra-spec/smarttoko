@@ -61,7 +61,7 @@ let db = JSON.parse(localStorage.getItem("db")) || [];
 let cart = [];
 let scanner = null;
 
-// 🔊 SOUND BEEP
+// 🔊 BEEP
 function beep(){
  let ctx = new (window.AudioContext || window.webkitAudioContext)();
  let osc = ctx.createOscillator();
@@ -69,7 +69,7 @@ function beep(){
  osc.frequency.value = 1000;
  osc.connect(ctx.destination);
  osc.start();
- setTimeout(()=>{osc.stop();},100);
+ setTimeout(()=>osc.stop(),100);
 }
 
 // FORMAT RUPIAH
@@ -82,7 +82,7 @@ function genBarcode(){
  return Date.now().toString();
 }
 
-// SAVE DB
+// SAVE
 function save(){
  localStorage.setItem("db", JSON.stringify(db));
 }
@@ -122,8 +122,19 @@ function startScanner(){
   { facingMode: "environment" },
   { fps: 10, qrbox: 250 },
   (text)=>{
-    beep(); // 🔊 bunyi
-    tambahCartCepat(text);
+    beep();
+
+    let p = db.find(x=>x.barcode===text);
+
+    if(p){
+      // sudah ada → masuk keranjang
+      tambahCartCepat(text);
+    } else {
+      // belum ada → isi form otomatis
+      barcodeInput.value = text;
+      namaEl.focus();
+      alert("Produk belum ada, isi dulu!");
+    }
   }
  );
 }
@@ -184,7 +195,7 @@ function renderCart(){
  totalEl.innerHTML = "Total: "+rupiah(total);
 }
 
-// HAPUS ITEM
+// HAPUS
 function hapus(i){
  cart.splice(i,1);
  renderCart();
@@ -202,7 +213,7 @@ function checkout(){
  renderCart();
 }
 
-// TAMPIL STRUK
+// STRUK
 function tampilStruk(items, total){
  let tanggal = new Date().toLocaleString("id-ID");
 
@@ -234,7 +245,7 @@ function tampilStruk(items, total){
  struk.innerHTML = html;
 }
 
-// PRINT KHUSUS STRUK
+// PRINT
 function printStruk(){
  let isi = struk.innerHTML;
 
