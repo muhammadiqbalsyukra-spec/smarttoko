@@ -17,6 +17,7 @@ button {padding:8px; border:none; border-radius:6px; margin-top:5px;}
 .btn {background:green; color:white;}
 .btn-del {background:red; color:white;}
 .total {font-size:18px; font-weight:bold;}
+hr {border:0; border-top:1px dashed #000;}
 </style>
 </head>
 
@@ -42,7 +43,6 @@ button {padding:8px; border:none; border-radius:6px; margin-top:5px;}
 <div id="reader"></div>
 
 <input id="search" placeholder="Scan / ketik..." onkeyup="cariProduk(event)">
-<div id="hasil"></div>
 
 <h3>🛒 Keranjang</h3>
 <div id="cart"></div>
@@ -61,16 +61,30 @@ let db = JSON.parse(localStorage.getItem("db")) || [];
 let cart = [];
 let scanner = null;
 
-function save(){
- localStorage.setItem("db", JSON.stringify(db));
+// 🔊 SOUND BEEP
+function beep(){
+ let ctx = new (window.AudioContext || window.webkitAudioContext)();
+ let osc = ctx.createOscillator();
+ osc.type = "sine";
+ osc.frequency.value = 1000;
+ osc.connect(ctx.destination);
+ osc.start();
+ setTimeout(()=>{osc.stop();},100);
 }
 
+// FORMAT RUPIAH
 function rupiah(a){
  return "Rp " + (a||0).toLocaleString("id-ID");
 }
 
+// GENERATE BARCODE
 function genBarcode(){
  return Date.now().toString();
+}
+
+// SAVE DB
+function save(){
+ localStorage.setItem("db", JSON.stringify(db));
 }
 
 // TAMBAH PRODUK
@@ -82,7 +96,7 @@ function tambahProduk(){
  let harga_crt = parseInt(harga_crtEl.value);
  let isi = parseInt(isiEl.value);
 
- if(!nama || isNaN(stok) || isNaN(harga_pcs) || isNaN(isi)){
+ if(!nama || isNaN(stok) || isNaN(harga_pcs)){
   alert("Data belum lengkap!");
   return;
  }
@@ -98,7 +112,7 @@ function tambahProduk(){
  isiEl.value="";
 }
 
-// SCAN START
+// START SCANNER
 function startScanner(){
  if(scanner) return;
 
@@ -108,12 +122,13 @@ function startScanner(){
   { facingMode: "environment" },
   { fps: 10, qrbox: 250 },
   (text)=>{
+    beep(); // 🔊 bunyi
     tambahCartCepat(text);
   }
  );
 }
 
-// SCAN STOP
+// STOP SCANNER
 function stopScanner(){
  if(scanner){
   scanner.stop().then(()=>{
@@ -123,14 +138,15 @@ function stopScanner(){
  }
 }
 
-// TAMBAH CEPAT
+// TAMBAH KE CART
 function tambahCartCepat(code){
  let p = db.find(x=>x.barcode===code);
  if(!p) return;
 
  let item = cart.find(x=>x.barcode===code);
+
  if(item){
-  item.qty += 1;
+  item.qty++;
  } else {
   cart.push({...p, qty:1});
  }
@@ -138,7 +154,7 @@ function tambahCartCepat(code){
  renderCart();
 }
 
-// SEARCH
+// SEARCH MANUAL
 function cariProduk(e){
  if(e.key==="Enter"){
   tambahCartCepat(search.value);
@@ -158,8 +174,8 @@ function renderCart(){
   html+=`
   <div class="card">
     ${c.nama}<br>
-    ${c.qty} PCS<br>
-    ${rupiah(sub)}<br>
+    ${c.qty} x ${rupiah(c.harga_pcs)}<br>
+    Subtotal: ${rupiah(sub)}<br>
     <button class="btn-del" onclick="hapus(${i})">Hapus</button>
   </div>`;
  });
@@ -168,7 +184,7 @@ function renderCart(){
  totalEl.innerHTML = "Total: "+rupiah(total);
 }
 
-// HAPUS
+// HAPUS ITEM
 function hapus(i){
  cart.splice(i,1);
  renderCart();
@@ -176,34 +192,64 @@ function hapus(i){
 
 // CHECKOUT
 function checkout(){
- if(cart.length===0) return alert("Kosong");
+ if(cart.length===0) return alert("Keranjang kosong!");
 
  let total = cart.reduce((a,c)=>a + c.harga_pcs*c.qty,0);
 
- tampilStruk({items:cart,total});
+ tampilStruk(cart, total);
 
  cart=[];
- save();
  renderCart();
 }
 
-// STRUK
-function tampilStruk(data){
- let html = `<b>STOK TOKO PRO</b><br>----------------<br>`;
+// TAMPIL STRUK
+function tampilStruk(items, total){
+ let tanggal = new Date().toLocaleString("id-ID");
 
- data.items.forEach(i=>{
-  html+=`${i.nama}<br>${i.qty} PCS<br>${rupiah(i.harga_pcs*i.qty)}<br><br>`;
+ let html = `
+  <div style="text-align:center;">
+    <b>STOK TOKO PRO</b><br>
+    <small>${tanggal}</small>
+  </div>
+  <hr>
+ `;
+
+ items.forEach((i, index)=>{
+  let sub = i.qty * i.harga_pcs;
+  html += `
+    ${index+1}. ${i.nama}<br>
+    ${i.qty} x ${rupiah(i.harga_pcs)}<br>
+    ${rupiah(sub)}<br>
+    <hr>
+  `;
  });
 
- html+=`----------------<br>Total: ${rupiah(data.total)}`;
+ html += `
+  <b>Total: ${rupiah(total)}</b><br>
+  <hr>
+  <div style="text-align:center;">Terima kasih 🙏</div>
+ `;
 
  struk.style.display="block";
- struk.innerHTML=html;
+ struk.innerHTML = html;
 }
 
-// PRINT
+// PRINT KHUSUS STRUK
 function printStruk(){
- window.print();
+ let isi = struk.innerHTML;
+
+ let win = window.open('', '', 'width=300,height=600');
+
+ win.document.write(`
+  <html>
+  <head><title>Struk</title></head>
+  <body onload="window.print()">
+  ${isi}
+  </body>
+  </html>
+ `);
+
+ win.document.close();
 }
 
 // INIT
