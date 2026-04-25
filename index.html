@@ -13,90 +13,21 @@
 <script src="https://unpkg.com/html5-qrcode"></script>
 
 <style>
-:root{
-  --primary:#28a745;
-  --bg:#f5f6fa;
-}
-
-body{
-  margin:0;
-  font-family:'Segoe UI',sans-serif;
-  background:var(--bg);
-}
-
-header{
-  background:var(--primary);
-  color:white;
-  padding:15px;
-  text-align:center;
-  font-weight:bold;
-}
-
-.container{
-  padding:12px;
-  padding-bottom:90px;
-  max-width:600px;
-  margin:auto;
-}
-
-.card{
-  background:white;
-  border-radius:16px;
-  padding:12px;
-  margin-bottom:12px;
-  box-shadow:0 4px 10px rgba(0,0,0,0.08);
-}
-
-input{
-  width:100%;
-  padding:12px;
-  margin-bottom:8px;
-  border-radius:10px;
-  border:1px solid #ddd;
-}
-
-button{
-  width:100%;
-  padding:12px;
-  border:none;
-  border-radius:12px;
-  margin-top:6px;
-  font-weight:bold;
-}
-
-.btn{background:var(--primary); color:white;}
-.btn-del{background:#e74c3c; color:white;}
-
-.navbar{
-  position:fixed;
-  bottom:0;
-  left:0;
-  right:0;
-  display:flex;
-  justify-content:space-around;
-  background:white;
-  padding:10px;
-  box-shadow:0 -3px 10px rgba(0,0,0,0.1);
-}
-
-.nav-item{
-  text-align:center;
-  font-size:12px;
-  color:#999;
-}
-
-.nav-item.active{
-  color:var(--primary);
-  font-weight:bold;
-}
-
-.page{display:none; animation:fade .3s;}
+:root{--primary:#28a745;--bg:#f5f6fa;}
+body{margin:0;font-family:'Segoe UI',sans-serif;background:var(--bg);}
+header{background:var(--primary);color:white;padding:15px;text-align:center;font-weight:bold;}
+.container{padding:12px;padding-bottom:90px;max-width:600px;margin:auto;}
+.card{background:white;border-radius:16px;padding:12px;margin-bottom:12px;box-shadow:0 4px 10px rgba(0,0,0,0.08);}
+input{width:100%;padding:12px;margin-bottom:8px;border-radius:10px;border:1px solid #ddd;}
+button{width:100%;padding:12px;border:none;border-radius:12px;margin-top:6px;font-weight:bold;}
+.btn{background:var(--primary);color:white;}
+.btn-del{background:#e74c3c;color:white;}
+.navbar{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:space-around;background:white;padding:10px;box-shadow:0 -3px 10px rgba(0,0,0,0.1);}
+.nav-item{text-align:center;font-size:12px;color:#999;}
+.nav-item.active{color:var(--primary);font-weight:bold;}
+.page{display:none;animation:fade .3s;}
 .page.active{display:block;}
-
-@keyframes fade{
-  from{opacity:0; transform:translateY(10px);}
-  to{opacity:1; transform:translateY(0);}
-}
+@keyframes fade{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
 </style>
 </head>
 
@@ -139,6 +70,9 @@ button{
 <div id="total"></div>
 <button class="btn" onclick="checkout()">Checkout</button>
 
+<div id="struk" class="card" style="display:none;"></div>
+<button class="btn" onclick="printStruk()">🖨 Print Struk</button>
+
 </div>
 
 <!-- LAPORAN -->
@@ -168,7 +102,7 @@ button{
 
 <script>
 
-  const firebaseConfig = {
+const firebaseConfig = {
   apiKey: "AIzaSyBYkPd9KaoJoSEAhO2BsVz8P76GnNJuVnY",
   authDomain: "smarttoko-cfa75.firebaseapp.com",
   projectId: "smarttoko-cfa75",
@@ -178,27 +112,24 @@ button{
   measurementId: "G-PV0T28BK91"
 };
 
-
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
 let user=null;
-let produk=[], cart=[], riwayat=[];
+let produk=[];
+let keranjang=[];
+let riwayat=[];
 
 // AUTH
 function register(){
  auth.createUserWithEmailAndPassword(email.value,password.value)
   .then(()=>alert("Berhasil daftar"));
 }
-
 function login(){
  auth.signInWithEmailAndPassword(email.value,password.value);
 }
-
-function logout(){
- auth.signOut();
-}
+function logout(){auth.signOut();}
 
 auth.onAuthStateChanged(u=>{
  if(u){
@@ -216,7 +147,6 @@ auth.onAuthStateChanged(u=>{
 function showPage(p,el){
  document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
  document.querySelectorAll(".nav-item").forEach(x=>x.classList.remove("active"));
-
  document.getElementById("page"+p).classList.add("active");
  el.classList.add("active");
 }
@@ -224,7 +154,7 @@ function showPage(p,el){
 // UTIL
 function rupiah(n){return "Rp "+(n||0).toLocaleString("id-ID");}
 
-// FIRESTORE
+// LOAD DATA
 function loadData(){
  db.collection("users").doc(user.uid).collection("produk")
  .onSnapshot(snap=>{
@@ -240,7 +170,7 @@ function loadData(){
  });
 }
 
-// PRODUK
+// TAMBAH PRODUK
 function tambahProduk(){
  db.collection("users").doc(user.uid).collection("produk").add({
   nama:nama.value,
@@ -250,13 +180,26 @@ function tambahProduk(){
  });
 }
 
-// CART
+// CART FIX
 function tambahCart(code){
- let p=produk.find(x=>x.barcode==code);
- if(!p || p.stok<=0) return alert("Stok habis");
+ let p = produk.find(x=>x.barcode==code);
 
- let item=cart.find(x=>x.barcode==code);
- if(item) item.qty++; else cart.push({...p,qty:1});
+ if(!p){
+  barcodeInput.value = code;
+  nama.focus();
+  alert("Produk belum ada!");
+  return;
+ }
+
+ if(p.stok<=0){
+  alert("Stok habis!");
+  return;
+ }
+
+ let item = keranjang.find(x=>x.barcode==code);
+
+ if(item){item.qty++;}
+ else{keranjang.push({...p,qty:1});}
 
  renderCart();
 }
@@ -264,63 +207,99 @@ function tambahCart(code){
 function renderCart(){
  let html="",total=0;
 
- cart.forEach(c=>{
+ keranjang.forEach((c,i)=>{
   let sub=c.qty*c.harga;
   total+=sub;
 
-  html+=`${c.nama}<br>${c.qty} x ${rupiah(c.harga)} = ${rupiah(sub)}<hr>`;
+  html+=`
+  ${c.nama}<br>
+  ${c.qty} x ${rupiah(c.harga)}<br>
+  ${rupiah(sub)}
+  <button onclick="hapus(${i})">Hapus</button>
+  <hr>`;
  });
 
- document.getElementById("cart").innerHTML=html||"Kosong";
- document.getElementById("total").innerHTML="Total: "+rupiah(total);
+ cart.innerHTML=html||"Kosong";
+ totalEl.innerHTML="Total: "+rupiah(total);
 }
 
-// CHECKOUT
-function checkout(){
- let total=0;
+function hapus(i){
+ keranjang.splice(i,1);
+ renderCart();
+}
 
- cart.forEach(c=>{
+// CHECKOUT FIX
+function checkout(){
+ if(keranjang.length==0) return;
+
+ let total=0;
+ let trx="TRX"+Date.now();
+ let tgl=new Date().toLocaleString();
+
+ keranjang.forEach(c=>{
   total+=c.qty*c.harga;
 
-  let ref=db.collection("users").doc(user.uid)
-  .collection("produk").doc(c.id);
-
-  ref.update({stok:c.stok-c.qty});
+  db.collection("users").doc(user.uid)
+   .collection("produk").doc(c.id)
+   .update({stok:c.stok-c.qty});
  });
 
- db.collection("users").doc(user.uid).collection("transaksi")
- .add({total:total,tgl:new Date().toLocaleString()});
+ db.collection("users").doc(user.uid)
+  .collection("transaksi")
+  .add({trx,tgl,total});
 
- cart=[];
+ tampilStruk(trx,tgl,keranjang,total);
+
+ keranjang=[];
+ renderCart();
+}
+
+// STRUK
+function tampilStruk(trx,tgl,items,total){
+ let toko = localStorage.getItem("nama_toko") || "TOKO";
+
+ let html=`
+ <center><b>${toko}</b><br>${tgl}<br>${trx}</center><hr>`;
+
+ items.forEach(i=>{
+  let sub=i.qty*i.harga;
+  html+=`${i.nama}<br>${i.qty} x ${rupiah(i.harga)}<br>${rupiah(sub)}<hr>`;
+ });
+
+ html+=`<b>Total: ${rupiah(total)}</b>`;
+
+ struk.style.display="block";
+ struk.innerHTML=html;
+}
+
+// PRINT
+function printStruk(){
+ let isi=struk.innerHTML;
+ let win=window.open('', '', 'width=300,height=600');
+ win.document.write(`<body onload="window.print()">${isi}</body>`);
+ win.document.close();
 }
 
 // LAPORAN
 function renderLaporan(){
  let total=riwayat.reduce((a,b)=>a+b.total,0);
 
- document.getElementById("laporan").innerHTML=
- `Transaksi: ${riwayat.length}<br>Omset: ${rupiah(total)}`;
+ laporan.innerHTML=`Transaksi: ${riwayat.length}<br>Omset: ${rupiah(total)}`;
 
- document.getElementById("riwayat").innerHTML=
- riwayat.slice(0,5).map(r=>`${rupiah(r.total)}<hr>`).join("");
+ riwayatEl.innerHTML=
+ riwayat.slice(0,5).map(r=>`${r.trx}<br>${rupiah(r.total)}<hr>`).join("");
 }
 
 // SCAN
 let scanner=null;
-
 function startScanner(){
  if(scanner) return;
-
  scanner=new Html5Qrcode("reader");
  scanner.start({facingMode:"environment"},{fps:10},
  text=>tambahCart(text));
 }
-
 function stopScanner(){
- if(scanner){
-  scanner.stop();
-  scanner=null;
- }
+ if(scanner){scanner.stop(); scanner=null;}
 }
 
 // SEARCH
@@ -330,6 +309,10 @@ function cariProduk(e){
   search.value="";
  }
 }
+
+// INIT
+renderCart();
+renderLaporan();
 
 </script>
 
