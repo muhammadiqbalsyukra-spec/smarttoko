@@ -19,7 +19,7 @@ input{width:100%;padding:10px;margin-bottom:8px;border-radius:8px;border:1px sol
 button{width:100%;padding:10px;border:none;border-radius:10px;margin-top:5px;}
 .btn{background:#22c55e;color:white;}
 .btn-del{background:red;color:white;}
-.navbar{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:space-around;background:#fff;padding:10px;z-index:9999;}
+.navbar{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:space-around;background:#fff;padding:10px;}
 .page{display:none;}
 .page.active{display:block;}
 </style>
@@ -31,7 +31,6 @@ button{width:100%;padding:10px;border:none;border-radius:10px;margin-top:5px;}
 
 <div class="container">
 
-<!-- LOGIN -->
 <div id="loginPage" class="card">
 <h3>Login</h3>
 <input id="email" placeholder="Email">
@@ -40,12 +39,9 @@ button{width:100%;padding:10px;border:none;border-radius:10px;margin-top:5px;}
 <button onclick="register()">Daftar</button>
 </div>
 
-<!-- APP -->
 <div id="app" style="display:none">
 
-<!-- KASIR -->
 <div id="pageKasir" class="page active">
-
 <input id="search" placeholder="Scan / ketik..." oninput="autoSearch()">
 
 <button class="btn" onclick="startScanner()">📷 Scan</button>
@@ -60,10 +56,8 @@ button{width:100%;padding:10px;border:none;border-radius:10px;margin-top:5px;}
 
 <div id="struk" class="card" style="display:none"></div>
 <button class="btn" onclick="printStruk()">Print</button>
-
 </div>
 
-<!-- PRODUK -->
 <div id="pageProduk" class="page">
 <div class="card">
 <input id="nama" placeholder="Nama barang">
@@ -84,29 +78,27 @@ button{width:100%;padding:10px;border:none;border-radius:10px;margin-top:5px;}
 
 <script>
 
+// 🔥 FIREBASE
 const firebaseConfig = {
-  apiKey: "AIzaSyBYkPd9KaoJoSEAhO2BsVz8P76GnNJuVnY",
-  authDomain: "smarttoko-cfa75.firebaseapp.com",
-  projectId: "smarttoko-cfa75",
-  storageBucket: "smarttoko-cfa75.firebasestorage.app",
-  messagingSenderId: "408497647205",
-  appId: "1:408497647205:web:cedd0b3ec9775c4897e08c",
-  measurementId: "G-PV0T28BK91"
+ apiKey: "AIzaSyBYkPd9KaoJoSEAhO2BsVz8P76GnNJuVnY",
+ authDomain: "smarttoko-cfa75.firebaseapp.com",
+ projectId: "smarttoko-cfa75"
 };
-
 firebase.initializeApp(firebaseConfig);
 const auth=firebase.auth();
 const db=firebase.firestore();
 
 let user=null, produk=[], cart=[], scanner=null;
+let lastScan=""; // anti double scan
+
+// 🔊 BEEP
+function beep(){
+ new Audio("https://www.soundjay.com/button/beep-07.wav").play();
+}
 
 // AUTH
-function register(){
- auth.createUserWithEmailAndPassword(email.value,password.value);
-}
-function login(){
- auth.signInWithEmailAndPassword(email.value,password.value);
-}
+function register(){auth.createUserWithEmailAndPassword(email.value,password.value);}
+function login(){auth.signInWithEmailAndPassword(email.value,password.value);}
 
 auth.onAuthStateChanged(u=>{
  if(u){
@@ -120,7 +112,7 @@ auth.onAuthStateChanged(u=>{
  }
 });
 
-// LOAD DATA
+// LOAD
 function loadData(){
  db.collection("users").doc(user.uid).collection("produk")
  .onSnapshot(snap=>{
@@ -136,19 +128,24 @@ function showPage(p){
  stopScanner();
 }
 
-// SCAN FIX
+// 📷 SCAN FIX BACK CAMERA
 function startScanner(){
  if(scanner) return;
 
  scanner=new Html5Qrcode("reader");
 
- Html5Qrcode.getCameras().then(devices=>{
-  let cam=devices[0].id;
-
-  scanner.start(cam,{fps:10},text=>{
+ scanner.start(
+  { facingMode: "environment" }, // 🔥 kamera belakang
+  { fps:10, qrbox:250 },
+  text=>{
+    if(text === lastScan) return; // anti double
+    lastScan = text;
+    beep();
     handleScan(text);
-  });
- });
+
+    setTimeout(()=>{ lastScan=""; },1500);
+  }
+ );
 }
 
 function stopScanner(){
@@ -157,26 +154,31 @@ function stopScanner(){
  }
 }
 
-// HANDLE SCAN MULTI MODE
+// HANDLE SCAN
 function handleScan(code){
-
- // produk mode
  if(document.getElementById("pageProduk").classList.contains("active")){
    barcodeInput.value = code;
    return;
  }
-
  tambahCart(code);
 }
 
-// TAMBAH PRODUK
+// PRODUK
 function tambahProduk(){
+ if(!nama.value || !barcodeInput.value){
+   alert("Isi data dulu!");
+   return;
+ }
+
  db.collection("users").doc(user.uid).collection("produk").add({
   nama:nama.value,
   barcode:barcodeInput.value,
-  stok:parseInt(stok.value),
-  harga:parseInt(harga.value)
+  stok:parseInt(stok.value)||0,
+  harga:parseInt(harga.value)||0
  });
+
+ nama.value=""; barcodeInput.value=""; stok.value=""; harga.value="";
+ alert("Produk tersimpan");
 }
 
 // CART
@@ -207,12 +209,12 @@ function renderCart(){
   let sub=c.qty*c.harga;
   total+=sub;
 
-  html+=`${c.nama}<br>${c.qty} x Rp ${c.harga}<br>Rp ${sub}
+  html+=`${c.nama}<br>${c.qty} x Rp ${c.harga}<br><b>Rp ${sub}</b>
   <button onclick="hapus(${i})">Hapus</button><hr>`;
  });
 
  cartBox.innerHTML=html||"Kosong";
- totalBox.innerHTML="Total: Rp "+total;
+ totalBox.innerHTML="<b>Total: Rp "+total+"</b>";
 }
 
 function hapus(i){
@@ -220,7 +222,7 @@ function hapus(i){
  renderCart();
 }
 
-// AUTO SEARCH FIX
+// SEARCH
 function autoSearch(){
  let code=search.value.trim();
  let p=produk.find(x=>x.barcode==code);
@@ -259,9 +261,17 @@ function checkout(){
 // STRUK
 function tampilStruk(trx,total){
  struk.style.display="block";
- struk.innerHTML=`<b>TOKO</b><br>${trx}<br>Total: Rp ${total}`;
+ struk.innerHTML=`
+ <center>
+ <b>SMART TOKO</b><br>
+ ${trx}<br>
+ ----------------<br>
+ Total: Rp ${total}<br>
+ ----------------
+ </center>`;
 }
 
+// PRINT
 function printStruk(){
  let w=window.open('','','width=300,height=600');
  w.document.write(struk.innerHTML);
