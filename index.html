@@ -53,6 +53,13 @@ button{width:100%;padding:10px;border:none;border-radius:10px;margin-top:5px;}
 <div id="cartBox" class="card"></div>
 <div id="totalBox"></div>
 
+<!-- 🔥 TAMBAHAN UKURAN STRUK -->
+<select id="ukuranStruk">
+  <option value="58">58 mm (kecil)</option>
+  <option value="72">72 mm</option>
+  <option value="80">80 mm (besar)</option>
+</select>
+
 <button class="btn" onclick="checkout()">Checkout</button>
 
 <div id="struk" class="card" style="display:none"></div>
@@ -94,11 +101,14 @@ button{width:100%;padding:10px;border:none;border-radius:10px;margin-top:5px;}
 
 <script>
 
-// FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyBYkPd9KaoJoSEAhO2BsVz8P76GnNJuVnY",
   authDomain: "smarttoko-cfa75.firebaseapp.com",
-  projectId: "smarttoko-cfa75"
+  projectId: "smarttoko-cfa75",
+  storageBucket: "smarttoko-cfa75.firebasestorage.app",
+  messagingSenderId: "408497647205",
+  appId: "1:408497647205:web:cedd0b3ec9775c4897e08c",
+  measurementId: "G-PV0T28BK91"
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -250,27 +260,14 @@ function renderCart(){
  let html="",total=0;
 
  cart.forEach((c,i)=>{
-  let qty=c.qty;
+  let sub = c.qty * (c.harga_crt || c.harga);
+  total += sub;
 
-  if(c.satuan==="PCS" && c.isi>0){
-    let crt=Math.floor(qty/c.isi);
-    let sisa=qty%c.isi;
-
-    if(crt>0){
-      html+=`${c.nama}<br>${crt} CRT<br>`;
-      total+=crt*(c.harga_crt||c.harga);
-    }
-    if(sisa>0){
-      html+=`${sisa} PCS<br>`;
-      total+=sisa*c.harga;
-    }
-  }else{
-    let sub=qty*(c.harga_crt||c.harga);
-    total+=sub;
-    html+=`${c.nama}<br>${qty} ${c.satuan}<br>`;
-  }
-
-  html+=`<button onclick="hapus(${i})">Hapus</button><hr>`;
+  html+=`
+  ${c.nama}<br>
+  ${c.qty} x Rp ${c.harga} = Rp ${sub}<br>
+  <button onclick="hapus(${i})">Hapus</button>
+  <hr>`;
  });
 
  cartBox.innerHTML=html||"Kosong";
@@ -296,25 +293,65 @@ function checkout(){
  if(cart.length==0)return;
 
  let total=0;
- cart.forEach(c=> total+=c.qty*c.harga);
+ cart.forEach(c=> total+=c.qty*(c.harga_crt||c.harga));
 
  tampilStruk(total);
  cart=[];
  renderCart();
 }
 
+// 🔥 STRUK BARU
 function tampilStruk(total){
+ let html = `<h3 style="text-align:center">SMART TOKO</h3><hr>`;
+
+ cart.forEach(c=>{
+   let harga = c.harga_crt || c.harga;
+   let sub = c.qty * harga;
+
+   html += `
+   ${c.nama}<br>
+   ${c.qty} x Rp ${harga} = Rp ${sub}<br><br>
+   `;
+ });
+
+ html += `
+ <hr>
+ <b>Total: Rp ${total}</b><br><br>
+ <div style="text-align:center">
+ Terima kasih sudah berbelanja 🙏
+ </div>
+ `;
+
  struk.style.display="block";
- struk.innerHTML=`SMART TOKO<br>Total: Rp ${total}`;
+ struk.innerHTML = html;
 }
 
-// PRINT
+// 🔥 PRINT PRO
 function printStruk(){
- let isi=struk.innerHTML;
+ let isi = struk.innerHTML;
+ let ukuran = document.getElementById("ukuranStruk").value;
 
- let w=window.open("","_blank");
+ let width;
+ if(ukuran=="58") width="220px";
+ else if(ukuran=="72") width="260px";
+ else width="300px";
+
+ let w = window.open("", "_blank");
+
  w.document.write(`
  <html>
+ <head>
+ <style>
+ body{
+   font-family: monospace;
+   width:${width};
+   margin:auto;
+   font-size:12px;
+ }
+ hr{border-top:1px dashed black;}
+ h3{text-align:center;margin:5px 0;}
+ </style>
+ </head>
  <body>
  ${isi}
  <script>
