@@ -62,6 +62,9 @@ button{width:100%;padding:10px;border:none;border-radius:10px;margin-top:5px;}
 <!-- PRODUK -->
 <div id="pageProduk" class="page">
 <div class="card">
+
+<button class="btn" onclick="startScanner()">📷 Scan Barcode Produk</button>
+
 <input id="nama" placeholder="Nama barang">
 <input id="barcodeInput" placeholder="Barcode">
 
@@ -89,9 +92,8 @@ button{width:100%;padding:10px;border:none;border-radius:10px;margin-top:5px;}
 
 <script>
 
-// 🔥 FIREBASE
 const firebaseConfig = {
- apiKey: "AIzaSyBYkPd9KaoJoSEAhO2BsVz8P76GnNJuVnY",
+ apiKey: "AIzaSy...",
  authDomain: "smarttoko-cfa75.firebaseapp.com",
  projectId: "smarttoko-cfa75"
 };
@@ -102,12 +104,10 @@ const db=firebase.firestore();
 let user=null, produk=[], cart=[], scanner=null;
 let lastScan="";
 
-// 🔊 BEEP
 function beep(){
  new Audio("https://www.soundjay.com/button/beep-07.wav").play();
 }
 
-// AUTH
 function register(){auth.createUserWithEmailAndPassword(email.value,password.value);}
 function login(){auth.signInWithEmailAndPassword(email.value,password.value);}
 
@@ -123,7 +123,6 @@ auth.onAuthStateChanged(u=>{
  }
 });
 
-// LOAD DATA
 function loadData(){
  db.collection("users").doc(user.uid).collection("produk")
  .onSnapshot(snap=>{
@@ -132,14 +131,12 @@ function loadData(){
  });
 }
 
-// NAV
 function showPage(p){
  document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
  document.getElementById("page"+p).classList.add("active");
  stopScanner();
 }
 
-// SCANNER
 function startScanner(){
  if(scanner) return;
 
@@ -164,23 +161,17 @@ function stopScanner(){
  }
 }
 
-// HANDLE SCAN
+// 🔥 FIX SCAN PRODUK
 function handleScan(code){
  if(document.getElementById("pageProduk").classList.contains("active")){
    barcodeInput.value = code;
-   nama.focus();
    return;
  }
  tambahCart(code);
 }
 
-// TAMBAH PRODUK
+// 🔥 TAMBAH PRODUK
 function tambahProduk(){
- if(!nama.value || !barcodeInput.value){
-   alert("Lengkapi data!");
-   return;
- }
-
  db.collection("users").doc(user.uid).collection("produk").add({
   nama:nama.value,
   barcode:barcodeInput.value,
@@ -191,36 +182,56 @@ function tambahProduk(){
   isi:parseInt(isi.value)||1
  });
 
- nama.value="";barcodeInput.value="";stok.value="";harga.value="";harga_crt.value="";isi.value="";
  alert("Produk tersimpan");
 }
 
-// TAMBAH CART
+// 🔥 FIX PCS ➜ CRT (tidak merusak data asli)
 function tambahCart(code){
  let p=produk.find(x=>x.barcode==code);
 
  if(!p){ alert("Produk belum ada"); return; }
- if(p.stok<=0){ alert("Stok habis"); return; }
-
- let hargaFinal = (p.satuan==="CRT") ? (p.harga_crt||p.harga) : p.harga;
 
  let item=cart.find(x=>x.barcode==code);
- if(item)item.qty++;
- else cart.push({...p,qty:1,hargaFinal});
+
+ if(item){
+   item.qty++;
+ }else{
+   cart.push({...p,qty:1});
+ }
 
  renderCart();
 }
 
-// RENDER CART
 function renderCart(){
  let html="",total=0;
 
  cart.forEach((c,i)=>{
-  let sub=c.qty*c.hargaFinal;
-  total+=sub;
 
-  html+=`${c.nama}<br>${c.qty} x Rp ${c.hargaFinal}<br><b>Rp ${sub}</b>
-  <button onclick="hapus(${i})">Hapus</button><hr>`;
+  let harga = c.harga;
+  let qty = c.qty;
+  let label = "PCS";
+
+  if(c.satuan==="PCS" && c.isi>0){
+    let crt = Math.floor(qty / c.isi);
+    let sisa = qty % c.isi;
+
+    if(crt>0){
+      html += `${c.nama}<br>${crt} CRT<br>`;
+      total += crt * (c.harga_crt || c.harga);
+    }
+
+    if(sisa>0){
+      html += `${sisa} PCS<br>`;
+      total += sisa * c.harga;
+    }
+
+  }else{
+    let sub = qty * (c.harga_crt || c.harga);
+    total += sub;
+    html += `${c.nama}<br>${qty} ${c.satuan}<br>`;
+  }
+
+  html += `<button onclick="hapus(${i})">Hapus</button><hr>`;
  });
 
  cartBox.innerHTML=html||"Kosong";
@@ -232,60 +243,51 @@ function hapus(i){
  renderCart();
 }
 
-// SEARCH
 function autoSearch(){
  let code=search.value.trim();
  let p=produk.find(x=>x.barcode==code);
-
  if(p){
    tambahCart(code);
    search.value="";
  }
 }
 
-// CHECKOUT
 function checkout(){
  if(cart.length==0)return;
 
  let total=0;
- let trx="TRX"+Date.now();
-
  cart.forEach(c=>{
-  total+=c.qty*c.hargaFinal;
-
-  db.collection("users").doc(user.uid)
-  .collection("produk").doc(c.id)
-  .update({stok:c.stok-c.qty});
+   total+=c.qty*c.harga;
  });
 
- db.collection("users").doc(user.uid)
- .collection("transaksi")
- .add({trx,total,tgl:new Date().toLocaleString()});
-
- tampilStruk(trx,total);
-
+ tampilStruk(total);
  cart=[];
  renderCart();
 }
 
-// STRUK
-function tampilStruk(trx,total){
+function tampilStruk(total){
  struk.style.display="block";
- struk.innerHTML=`
- <center>
- <b>SMART TOKO</b><br>
- ${trx}<br>
- ----------------<br>
- Total: Rp ${total}<br>
- ----------------
- </center>`;
+ struk.innerHTML=`SMART TOKO<br>Total: Rp ${total}`;
 }
 
-// PRINT FIX
+// 🔥 PRINT FIX TOTAL
 function printStruk(){
- let isi=struk.innerHTML;
- let w=window.open("","","width=300,height=600");
- w.document.write(`<html><body onload="window.print();window.close();">${isi}</body></html>`);
+ let isi = struk.innerHTML;
+
+ let w = window.open("", "_blank");
+ w.document.write(`
+ <html>
+ <body>
+ ${isi}
+ <script>
+ window.onload=function(){
+   window.print();
+   setTimeout(()=>window.close(),500);
+ }
+ <\/script>
+ </body>
+ </html>
+ `);
 }
 
 </script>
