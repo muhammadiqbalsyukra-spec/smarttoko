@@ -326,9 +326,8 @@ function tampilStruk(total){
  struk.innerHTML = html;
 }
 
-// 🔥 PRINT PRO
 function printStruk(){
- let isi = struk.innerHTML;
+ let isi = document.getElementById("struk").innerHTML;
  let ukuran = document.getElementById("ukuranStruk").value;
 
  let width;
@@ -338,9 +337,11 @@ function printStruk(){
 
  let w = window.open("", "_blank");
 
+ w.document.open();
  w.document.write(`
  <html>
  <head>
+ <title>Print</title>
  <style>
  body{
    font-family: monospace;
@@ -354,15 +355,17 @@ function printStruk(){
  </head>
  <body>
  ${isi}
- <script>
- window.onload=function(){
-   window.print();
-   setTimeout(()=>window.close(),500);
- }
- <\/script>
  </body>
  </html>
  `);
+
+ w.document.close(); // 🔥 WAJIB
+
+ // 🔥 Delay supaya konten benar-benar render
+ setTimeout(()=>{
+   w.focus();
+   w.print();
+ },500);
 }
 
 </script>
