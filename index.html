@@ -15,7 +15,7 @@ body{margin:0;font-family:sans-serif;background:#f4f6f9;}
 header{background:#22c55e;color:#fff;padding:15px;text-align:center;}
 .container{padding:10px;padding-bottom:100px;max-width:600px;margin:auto;}
 .card{background:#fff;padding:12px;border-radius:12px;margin-bottom:10px;}
-input{width:100%;padding:10px;margin-bottom:8px;border-radius:8px;border:1px solid #ddd;}
+input,select{width:100%;padding:10px;margin-bottom:8px;border-radius:8px;border:1px solid #ddd;}
 button{width:100%;padding:10px;border:none;border-radius:10px;margin-top:5px;}
 .btn{background:#22c55e;color:white;}
 .btn-del{background:red;color:white;}
@@ -41,6 +41,7 @@ button{width:100%;padding:10px;border:none;border-radius:10px;margin-top:5px;}
 
 <div id="app" style="display:none">
 
+<!-- KASIR -->
 <div id="pageKasir" class="page active">
 <input id="search" placeholder="Scan / ketik..." oninput="autoSearch()">
 
@@ -58,12 +59,22 @@ button{width:100%;padding:10px;border:none;border-radius:10px;margin-top:5px;}
 <button class="btn" onclick="printStruk()">Print</button>
 </div>
 
+<!-- PRODUK -->
 <div id="pageProduk" class="page">
 <div class="card">
 <input id="nama" placeholder="Nama barang">
 <input id="barcodeInput" placeholder="Barcode">
+
+<select id="satuan">
+<option value="PCS">PCS</option>
+<option value="CRT">CRT</option>
+</select>
+
+<input id="isi" type="number" placeholder="Isi per CRT (contoh 12)">
 <input id="stok" type="number" placeholder="Stok">
-<input id="harga" type="number" placeholder="Harga">
+<input id="harga" type="number" placeholder="Harga PCS">
+<input id="harga_crt" type="number" placeholder="Harga CRT">
+
 <button class="btn" onclick="tambahProduk()">Simpan</button>
 </div>
 </div>
@@ -89,7 +100,7 @@ const auth=firebase.auth();
 const db=firebase.firestore();
 
 let user=null, produk=[], cart=[], scanner=null;
-let lastScan=""; // anti double scan
+let lastScan="";
 
 // 🔊 BEEP
 function beep(){
@@ -112,7 +123,7 @@ auth.onAuthStateChanged(u=>{
  }
 });
 
-// LOAD
+// LOAD DATA
 function loadData(){
  db.collection("users").doc(user.uid).collection("produk")
  .onSnapshot(snap=>{
@@ -128,22 +139,21 @@ function showPage(p){
  stopScanner();
 }
 
-// 📷 SCAN FIX BACK CAMERA
+// SCANNER
 function startScanner(){
  if(scanner) return;
 
  scanner=new Html5Qrcode("reader");
 
  scanner.start(
-  { facingMode: "environment" }, // 🔥 kamera belakang
+  { facingMode: "environment" },
   { fps:10, qrbox:250 },
   text=>{
-    if(text === lastScan) return; // anti double
-    lastScan = text;
+    if(text===lastScan) return;
+    lastScan=text;
     beep();
     handleScan(text);
-
-    setTimeout(()=>{ lastScan=""; },1500);
+    setTimeout(()=>lastScan="",1500);
   }
  );
 }
@@ -158,15 +168,16 @@ function stopScanner(){
 function handleScan(code){
  if(document.getElementById("pageProduk").classList.contains("active")){
    barcodeInput.value = code;
+   nama.focus();
    return;
  }
  tambahCart(code);
 }
 
-// PRODUK
+// TAMBAH PRODUK
 function tambahProduk(){
  if(!nama.value || !barcodeInput.value){
-   alert("Isi data dulu!");
+   alert("Lengkapi data!");
    return;
  }
 
@@ -174,42 +185,41 @@ function tambahProduk(){
   nama:nama.value,
   barcode:barcodeInput.value,
   stok:parseInt(stok.value)||0,
-  harga:parseInt(harga.value)||0
+  harga:parseInt(harga.value)||0,
+  harga_crt:parseInt(harga_crt.value)||0,
+  satuan:satuan.value,
+  isi:parseInt(isi.value)||1
  });
 
- nama.value=""; barcodeInput.value=""; stok.value=""; harga.value="";
+ nama.value="";barcodeInput.value="";stok.value="";harga.value="";harga_crt.value="";isi.value="";
  alert("Produk tersimpan");
 }
 
-// CART
+// TAMBAH CART
 function tambahCart(code){
  let p=produk.find(x=>x.barcode==code);
 
- if(!p){
-   barcodeInput.value=code;
-   alert("Produk belum ada");
-   return;
- }
+ if(!p){ alert("Produk belum ada"); return; }
+ if(p.stok<=0){ alert("Stok habis"); return; }
 
- if(p.stok<=0){
-   alert("Stok habis");
-   return;
- }
+ let hargaFinal = (p.satuan==="CRT") ? (p.harga_crt||p.harga) : p.harga;
 
  let item=cart.find(x=>x.barcode==code);
- if(item)item.qty++; else cart.push({...p,qty:1});
+ if(item)item.qty++;
+ else cart.push({...p,qty:1,hargaFinal});
 
  renderCart();
 }
 
+// RENDER CART
 function renderCart(){
  let html="",total=0;
 
  cart.forEach((c,i)=>{
-  let sub=c.qty*c.harga;
+  let sub=c.qty*c.hargaFinal;
   total+=sub;
 
-  html+=`${c.nama}<br>${c.qty} x Rp ${c.harga}<br><b>Rp ${sub}</b>
+  html+=`${c.nama}<br>${c.qty} x Rp ${c.hargaFinal}<br><b>Rp ${sub}</b>
   <button onclick="hapus(${i})">Hapus</button><hr>`;
  });
 
@@ -241,7 +251,7 @@ function checkout(){
  let trx="TRX"+Date.now();
 
  cart.forEach(c=>{
-  total+=c.qty*c.harga;
+  total+=c.qty*c.hargaFinal;
 
   db.collection("users").doc(user.uid)
   .collection("produk").doc(c.id)
@@ -271,11 +281,11 @@ function tampilStruk(trx,total){
  </center>`;
 }
 
-// PRINT
+// PRINT FIX
 function printStruk(){
- let w=window.open('','','width=300,height=600');
- w.document.write(struk.innerHTML);
- w.print();
+ let isi=struk.innerHTML;
+ let w=window.open("","","width=300,height=600");
+ w.document.write(`<html><body onload="window.print();window.close();">${isi}</body></html>`);
 }
 
 </script>
