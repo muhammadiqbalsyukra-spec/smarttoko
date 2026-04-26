@@ -45,10 +45,10 @@ button{width:100%;padding:10px;border:none;border-radius:10px;margin-top:5px;}
 <div id="pageKasir" class="page active">
 <input id="search" placeholder="Scan / ketik..." oninput="autoSearch()">
 
-<button class="btn" onclick="startScanner()">📷 Scan</button>
-<button class="btn-del" onclick="stopScanner()">Stop</button>
+<button class="btn" onclick="startScannerKasir()">📷 Scan Kasir</button>
+<button class="btn-del" onclick="stopAllScanner()">Stop</button>
 
-<div id="reader"></div>
+<div id="readerKasir"></div>
 
 <div id="cartBox" class="card"></div>
 <div id="totalBox"></div>
@@ -63,7 +63,9 @@ button{width:100%;padding:10px;border:none;border-radius:10px;margin-top:5px;}
 <div id="pageProduk" class="page">
 <div class="card">
 
-<button class="btn" onclick="startScanner()">📷 Scan Barcode Produk</button>
+<button class="btn" onclick="startScannerProduk()">📷 Scan Barcode Produk</button>
+
+<div id="readerProduk"></div>
 
 <input id="nama" placeholder="Nama barang">
 <input id="barcodeInput" placeholder="Barcode">
@@ -92,28 +94,28 @@ button{width:100%;padding:10px;border:none;border-radius:10px;margin-top:5px;}
 
 <script>
 
+// FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyBYkPd9KaoJoSEAhO2BsVz8P76GnNJuVnY",
   authDomain: "smarttoko-cfa75.firebaseapp.com",
-  projectId: "smarttoko-cfa75",
-  storageBucket: "smarttoko-cfa75.firebasestorage.app",
-  messagingSenderId: "408497647205",
-  appId: "1:408497647205:web:cedd0b3ec9775c4897e08c",
-  measurementId: "G-PV0T28BK91"
+  projectId: "smarttoko-cfa75"
 };
 
 firebase.initializeApp(firebaseConfig);
 const auth=firebase.auth();
 const db=firebase.firestore();
 
-let user=null, produk=[], cart=[], scanner=null;
+// GLOBAL
+let user=null, produk=[], cart=[];
+let scannerKasir=null, scannerProduk=null;
 let lastScan="";
 
+// SOUND
 function beep(){
  new Audio("https://www.soundjay.com/button/beep-07.wav").play();
 }
 
-// 🔥 FIX LOGIN + ERROR
+// LOGIN
 function login(){
  auth.signInWithEmailAndPassword(email.value,password.value)
  .catch(e=>alert("Login gagal: "+e.message));
@@ -136,6 +138,7 @@ auth.onAuthStateChanged(u=>{
  }
 });
 
+// LOAD DATA
 function loadData(){
  db.collection("users").doc(user.uid).collection("produk")
  .onSnapshot(snap=>{
@@ -144,44 +147,67 @@ function loadData(){
  });
 }
 
+// NAVIGASI
 function showPage(p){
  document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
  document.getElementById("page"+p).classList.add("active");
- stopScanner();
+ stopAllScanner();
 }
 
-function startScanner(){
- if(scanner) return;
+// SCANNER STOP
+function stopAllScanner(){
+ if(scannerKasir){
+   scannerKasir.stop().catch(()=>{});
+   scannerKasir=null;
+   readerKasir.innerHTML="";
+ }
+ if(scannerProduk){
+   scannerProduk.stop().catch(()=>{});
+   scannerProduk=null;
+   readerProduk.innerHTML="";
+ }
+}
 
- scanner=new Html5Qrcode("reader");
+// SCANNER KASIR
+function startScannerKasir(){
+ stopAllScanner();
 
- scanner.start(
-  { facingMode: "environment" },
+ scannerKasir=new Html5Qrcode("readerKasir");
+
+ scannerKasir.start(
+  { facingMode:"environment" },
   { fps:10, qrbox:250 },
   text=>{
     if(text===lastScan) return;
     lastScan=text;
     beep();
-    handleScan(text);
+    tambahCart(text);
     setTimeout(()=>lastScan="",1500);
   }
  );
 }
 
-function stopScanner(){
- if(scanner){
-  scanner.stop().then(()=>{scanner=null;reader.innerHTML="";});
- }
+// SCANNER PRODUK
+function startScannerProduk(){
+ stopAllScanner();
+
+ scannerProduk=new Html5Qrcode("readerProduk");
+
+ scannerProduk.start(
+  { facingMode:"environment" },
+  { fps:10, qrbox:250 },
+  text=>{
+    if(text===lastScan) return;
+    lastScan=text;
+    beep();
+    barcodeInput.value=text;
+    stopAllScanner();
+    setTimeout(()=>lastScan="",1500);
+  }
+ );
 }
 
-function handleScan(code){
- if(document.getElementById("pageProduk").classList.contains("active")){
-   barcodeInput.value = code;
-   return;
- }
- tambahCart(code);
-}
-
+// TAMBAH PRODUK
 function tambahProduk(){
  if(!nama.value || !barcodeInput.value){
   alert("Isi data dulu");
@@ -200,7 +226,6 @@ function tambahProduk(){
 
  alert("Produk tersimpan");
 
- // reset form
  nama.value="";
  barcodeInput.value="";
  stok.value="";
@@ -209,6 +234,7 @@ function tambahProduk(){
  isi.value="";
 }
 
+// CART
 function tambahCart(code){
  let p=produk.find(x=>x.barcode==code);
  if(!p){ alert("Produk belum ada"); return; }
@@ -265,6 +291,7 @@ function autoSearch(){
  }
 }
 
+// CHECKOUT
 function checkout(){
  if(cart.length==0)return;
 
@@ -281,7 +308,7 @@ function tampilStruk(total){
  struk.innerHTML=`SMART TOKO<br>Total: Rp ${total}`;
 }
 
-// 🔥 PRINT FIX FINAL (ANTI BLANK APK)
+// PRINT
 function printStruk(){
  let isi=struk.innerHTML;
 
