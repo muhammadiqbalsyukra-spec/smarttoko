@@ -93,10 +93,15 @@ button{width:100%;padding:10px;border:none;border-radius:10px;margin-top:5px;}
 <script>
 
 const firebaseConfig = {
- apiKey: "AIzaSy...",
- authDomain: "smarttoko-cfa75.firebaseapp.com",
- projectId: "smarttoko-cfa75"
+  apiKey: "AIzaSyBYkPd9KaoJoSEAhO2BsVz8P76GnNJuVnY",
+  authDomain: "smarttoko-cfa75.firebaseapp.com",
+  projectId: "smarttoko-cfa75",
+  storageBucket: "smarttoko-cfa75.firebasestorage.app",
+  messagingSenderId: "408497647205",
+  appId: "1:408497647205:web:cedd0b3ec9775c4897e08c",
+  measurementId: "G-PV0T28BK91"
 };
+
 firebase.initializeApp(firebaseConfig);
 const auth=firebase.auth();
 const db=firebase.firestore();
@@ -108,8 +113,16 @@ function beep(){
  new Audio("https://www.soundjay.com/button/beep-07.wav").play();
 }
 
-function register(){auth.createUserWithEmailAndPassword(email.value,password.value);}
-function login(){auth.signInWithEmailAndPassword(email.value,password.value);}
+// 🔥 FIX LOGIN + ERROR
+function login(){
+ auth.signInWithEmailAndPassword(email.value,password.value)
+ .catch(e=>alert("Login gagal: "+e.message));
+}
+
+function register(){
+ auth.createUserWithEmailAndPassword(email.value,password.value)
+ .catch(e=>alert("Daftar gagal: "+e.message));
+}
 
 auth.onAuthStateChanged(u=>{
  if(u){
@@ -161,7 +174,6 @@ function stopScanner(){
  }
 }
 
-// 🔥 FIX SCAN PRODUK
 function handleScan(code){
  if(document.getElementById("pageProduk").classList.contains("active")){
    barcodeInput.value = code;
@@ -170,8 +182,12 @@ function handleScan(code){
  tambahCart(code);
 }
 
-// 🔥 TAMBAH PRODUK
 function tambahProduk(){
+ if(!nama.value || !barcodeInput.value){
+  alert("Isi data dulu");
+  return;
+ }
+
  db.collection("users").doc(user.uid).collection("produk").add({
   nama:nama.value,
   barcode:barcodeInput.value,
@@ -183,21 +199,23 @@ function tambahProduk(){
  });
 
  alert("Produk tersimpan");
+
+ // reset form
+ nama.value="";
+ barcodeInput.value="";
+ stok.value="";
+ harga.value="";
+ harga_crt.value="";
+ isi.value="";
 }
 
-// 🔥 FIX PCS ➜ CRT (tidak merusak data asli)
 function tambahCart(code){
  let p=produk.find(x=>x.barcode==code);
-
  if(!p){ alert("Produk belum ada"); return; }
 
  let item=cart.find(x=>x.barcode==code);
-
- if(item){
-   item.qty++;
- }else{
-   cart.push({...p,qty:1});
- }
+ if(item) item.qty++;
+ else cart.push({...p,qty:1});
 
  renderCart();
 }
@@ -206,32 +224,27 @@ function renderCart(){
  let html="",total=0;
 
  cart.forEach((c,i)=>{
-
-  let harga = c.harga;
-  let qty = c.qty;
-  let label = "PCS";
+  let qty=c.qty;
 
   if(c.satuan==="PCS" && c.isi>0){
-    let crt = Math.floor(qty / c.isi);
-    let sisa = qty % c.isi;
+    let crt=Math.floor(qty/c.isi);
+    let sisa=qty%c.isi;
 
     if(crt>0){
-      html += `${c.nama}<br>${crt} CRT<br>`;
-      total += crt * (c.harga_crt || c.harga);
+      html+=`${c.nama}<br>${crt} CRT<br>`;
+      total+=crt*(c.harga_crt||c.harga);
     }
-
     if(sisa>0){
-      html += `${sisa} PCS<br>`;
-      total += sisa * c.harga;
+      html+=`${sisa} PCS<br>`;
+      total+=sisa*c.harga;
     }
-
   }else{
-    let sub = qty * (c.harga_crt || c.harga);
-    total += sub;
-    html += `${c.nama}<br>${qty} ${c.satuan}<br>`;
+    let sub=qty*(c.harga_crt||c.harga);
+    total+=sub;
+    html+=`${c.nama}<br>${qty} ${c.satuan}<br>`;
   }
 
-  html += `<button onclick="hapus(${i})">Hapus</button><hr>`;
+  html+=`<button onclick="hapus(${i})">Hapus</button><hr>`;
  });
 
  cartBox.innerHTML=html||"Kosong";
@@ -256,9 +269,7 @@ function checkout(){
  if(cart.length==0)return;
 
  let total=0;
- cart.forEach(c=>{
-   total+=c.qty*c.harga;
- });
+ cart.forEach(c=> total+=c.qty*c.harga);
 
  tampilStruk(total);
  cart=[];
@@ -270,11 +281,11 @@ function tampilStruk(total){
  struk.innerHTML=`SMART TOKO<br>Total: Rp ${total}`;
 }
 
-// 🔥 PRINT FIX TOTAL
+// 🔥 PRINT FIX FINAL (ANTI BLANK APK)
 function printStruk(){
- let isi = struk.innerHTML;
+ let isi=struk.innerHTML;
 
- let w = window.open("", "_blank");
+ let w=window.open("","_blank");
  w.document.write(`
  <html>
  <body>
